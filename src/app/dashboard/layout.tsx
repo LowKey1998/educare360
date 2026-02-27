@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useAuth } from '@/hooks/use-auth';
@@ -80,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { title: 'Admissions', icon: UserPlus, href: '/dashboard/admissions', badge: '12' },
         { title: 'Pupil Management', icon: Users, href: '/dashboard/students' },
-        { title: 'Parent Portal', icon: Heart, href: '/dashboard/communication' },
+        { title: 'Parent Portal', icon: Heart, href: '/dashboard/parent-portal' },
         { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr' },
       ]
     },
@@ -129,8 +130,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen bg-[#F8F9FC] overflow-hidden">
       {/* Sidebar Overlay for Mobile */}
-      {!sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarOpen(true)} />
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
@@ -267,4 +268,3 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
-
