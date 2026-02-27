@@ -8,9 +8,10 @@ import {
   Plus, 
   Search, 
   MoreHorizontal, 
+  Loader2,
+  Database
 } from 'lucide-react';
-import { collection, query, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection } from '@/firebase';
 
 const STATUS_CONFIG: Record<string, { color: string, dot: string }> = {
   'New': { color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
@@ -26,14 +27,9 @@ const STATUS_LABELS = ['New', 'Under Review', 'Interview', 'Accepted', 'Waitlist
 export default function AdmissionsPage() {
   const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
   const [search, setSearch] = useState('');
-  const firestore = useFirestore();
+  const database = useDatabase();
 
-  const admissionsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'admissions'), orderBy('submissionDate', 'desc'));
-  }, [firestore]);
-
-  const { data: applications, loading } = useCollection(admissionsQuery);
+  const { data: applications, loading } = useRTDBCollection(database, 'admissions');
 
   const filteredApps = useMemo(() => {
     if (!applications) return [];
@@ -67,8 +63,13 @@ export default function AdmissionsPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-800">Admissions & Enrolment</h2>
-          <p className="text-xs text-gray-500">Manage applications, interviews, and class placement</p>
+          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            Admissions & Enrolment
+            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-semibold rounded-full flex items-center gap-1">
+              <Database className="h-2.5 w-2.5" /> Realtime Sync
+            </span>
+          </h2>
+          <p className="text-xs text-gray-500">Manage applications, interviews, and class placement via RTDB</p>
         </div>
         <div className="flex gap-2">
           <div className="flex bg-gray-100 rounded-lg p-0.5">
@@ -95,7 +96,7 @@ export default function AdmissionsPage() {
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
         {STATUS_LABELS.map(label => (
           <div key={label} className="bg-white rounded-xl border border-gray-100 p-3 text-center cursor-pointer hover:shadow-md transition-all">
-            <p className="text-lg font-bold text-gray-800">{groupedApps[label]?.length || 0}</p>
+            <p className="text-lg font-bold text-gray-800">{loading ? '...' : (groupedApps[label]?.length || 0)}</p>
             <p className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block ${STATUS_CONFIG[label].color}`}>{label}</p>
           </div>
         ))}
@@ -120,7 +121,7 @@ export default function AdmissionsPage() {
           <div key={label} className="bg-gray-50 rounded-xl p-3 min-w-[220px] h-fit">
             <div className="flex items-center justify-between mb-3">
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_CONFIG[label].color}`}>{label}</span>
-              <span className="text-[10px] text-gray-400 font-medium">{groupedApps[label]?.length || 0}</span>
+              <span className="text-[10px] text-gray-400 font-medium">{loading ? '...' : (groupedApps[label]?.length || 0)}</span>
             </div>
             
             <div className="space-y-2">
