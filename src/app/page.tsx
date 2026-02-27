@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { ref, set, serverTimestamp } from 'firebase/database';
+import { ref, set, serverTimestamp, onValue } from 'firebase/database';
 import { useAuth, useUser, useDatabase } from '@/firebase';
 import { Mail, Lock, Eye, EyeOff, Loader2, Sparkles, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -18,9 +18,11 @@ export default function SigninPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'staff' | 'parent'>('admin');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'admin' | 'staff' | 'parent'>('staff');
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -28,9 +30,38 @@ export default function SigninPage() {
     }
   }, [user, authLoading, router]);
 
+  // Check if an admin exists to allow/restrict admin signup
+  useEffect(() => {
+    if (!database) return;
+    const usersRef = ref(database, 'users');
+    const unsubscribe = onValue(usersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        setAdminExists(false);
+        setRole('admin'); // Default to admin for the very first user
+        return;
+      }
+      const hasAdmin = Object.values(data).some((u: any) => u.role === 'admin');
+      setAdminExists(hasAdmin);
+      // If admin exists and we were selecting admin, switch to staff
+      if (hasAdmin && role === 'admin') {
+        setRole('staff');
+      }
+    });
+    return () => unsubscribe();
+  }, [database, role]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
+    if (mode === 'signup' && !name) {
+      toast({
+        title: "Name Required",
+        description: "Please enter your full name to create an account.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setLoading(true);
     try {
@@ -49,12 +80,12 @@ export default function SigninPage() {
           email: newUser.email,
           role: role,
           createdAt: serverTimestamp(),
-          displayName: email.split('@')[0]
+          displayName: name
         });
 
         toast({
           title: "Account created!",
-          description: `Welcome to EduCare360 as a ${role}.`,
+          description: `Welcome to EduCare360, ${name}. Registered as a ${role}.`,
         });
       }
       router.push('/dashboard');
@@ -69,7 +100,7 @@ export default function SigninPage() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || (adminExists === null && database)) {
     return (
       <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -79,6 +110,11 @@ export default function SigninPage() {
       </div>
     );
   }
+
+  // Filter roles based on whether an admin already exists
+  const signupRoles = adminExists 
+    ? (['staff', 'parent'] as const) 
+    : (['admin', 'staff', 'parent'] as const);
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center p-6 selection:bg-teal-500/30">
@@ -131,25 +167,47 @@ export default function SigninPage() {
 
         <form onSubmit={handleSubmit} className="p-8 space-y-5">
           {mode === 'signup' && (
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Assign Role</label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['admin', 'staff', 'parent'] as const).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRole(r)}
-                    className={`py-2 px-1 rounded-lg border text-[10px] font-bold uppercase transition-all ${
-                      role === r 
-                        ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm' 
-                        : 'border-gray-100 text-gray-400 hover:border-gray-200'
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
+            <>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                <div className="relative group">
+                  <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-teal-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="John Doe" 
+                    required 
+                    className="w-full bg-white pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Assign Role</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {signupRoles.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRole(r)}
+                      className={`py-2 px-1 rounded-lg border text-[10px] font-bold uppercase transition-all ${
+                        role === r 
+                          ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm' 
+                          : 'border-gray-100 text-gray-400 hover:border-gray-200'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                {!adminExists && mode === 'signup' && (
+                  <p className="text-[9px] text-amber-600 font-medium bg-amber-50 p-1.5 rounded mt-1">
+                    No admin detected. First user must register as Administrator.
+                  </p>
+                )}
+              </div>
+            </>
           )}
 
           <div className="space-y-2">
