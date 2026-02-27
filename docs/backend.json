@@ -1,0 +1,66 @@
+
+{
+  "entities": {
+    "Admission": {
+      "title": "Admission",
+      "description": "A student application for enrollment.",
+      "type": "object",
+      "properties": {
+        "studentName": { "type": "string" },
+        "grade": { "type": "string" },
+        "age": { "type": "number" },
+        "status": { "type": "string", "enum": ["New", "Under Review", "Interview", "Accepted", "Waitlisted", "Rejected"] },
+        "submissionDate": { "type": "string" },
+        "docsPending": { "type": "boolean" },
+        "applicationId": { "type": "string" }
+      }
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "A daily attendance log for a student.",
+      "type": "object",
+      "properties": {
+        "studentName": { "type": "string" },
+        "grade": { "type": "string" },
+        "status": { "type": "string", "enum": ["present", "absent", "late"] },
+        "date": { "type": "string", "format": "date" },
+        "lastUpdated": { "type": "object" }
+      }
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A registered pupil in the school system.",
+      "type": "object",
+      "properties": {
+        "admissionNo": { "type": "string" },
+        "studentName": { "type": "string" },
+        "grade": { "type": "string" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "guardianName": { "type": "string" },
+        "guardianPhone": { "type": "string" },
+        "attendanceRate": { "type": "number" },
+        "feeBalance": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Suspended", "Transferred", "Graduated", "Withdrawn"] },
+        "dob": { "type": "string", "format": "date" },
+        "age": { "type": "number" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/admissions/{admissionId}": {
+      "schema": "#/backend/entities/Admission",
+      "description": "Collection of admission applications."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "#/backend/entities/AttendanceRecord",
+      "description": "Daily attendance logs."
+    },
+    "/students/{studentId}": {
+      "schema": "#/backend/entities/Student",
+      "description": "Collection of all enrolled pupils."
+    }
+  }
+}
