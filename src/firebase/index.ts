@@ -29,5 +29,6 @@ export const getDatabaseInstance = () => database;
 
 export { FirebaseProvider, useFirebase, useAuth, useDatabase } from './provider';
 export { useUser } from './auth/use-user';
+export { useUserProfile } from './auth/use-user-profile';
 export { useRTDBCollection } from './database/use-collection';
 export { useRTDBDoc } from './database/use-doc';

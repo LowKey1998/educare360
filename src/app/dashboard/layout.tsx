@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useUser, useAuth } from '@/firebase';
+import { useUserProfile, useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { 
   LayoutDashboard, 
@@ -11,7 +12,6 @@ import {
   Search,
   HelpCircle,
   Bell,
-  LogIn,
   ChevronDown,
   Building2,
   UserPlus,
@@ -34,7 +34,7 @@ import {
   Globe,
   Menu,
   ChevronsUpDown,
-  Loader2
+  UserCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -44,16 +44,16 @@ import { useState, useEffect } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
-  const { user, loading } = useUser();
+  const { profile, loading } = useUserProfile();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    if (!user && !loading) {
+    if (!profile && !loading) {
       router.push('/');
     }
-  }, [user, loading, router]);
+  }, [profile, loading, router]);
 
   const handleSignOut = async () => {
     try {
@@ -69,15 +69,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen bg-[#0F1A2E] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-12 w-12 bg-teal-500 rounded-xl flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-lg shadow-teal-500/20">E</div>
-          <p className="text-white/60 font-medium">Loading EduCare360...</p>
+          <p className="text-white/60 font-medium">Authenticating Profile...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) return null;
+  if (!profile) return null;
 
-  const navGroups = [
+  // Navigation logic based on roles
+  const isAdmin = profile.role === 'admin';
+  const isStaff = profile.role === 'staff';
+  const isParent = profile.role === 'parent';
+
+  // Navigation groups for Admin and Staff
+  const adminNav = [
     {
       label: 'OVERVIEW',
       color: 'text-teal-400',
@@ -88,6 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       label: 'PLATFORM',
       color: 'text-blue-400',
+      visible: isAdmin,
       items: [
         { title: 'Multi-School Mgmt', icon: Building2, href: '/dashboard/multi-school' },
         { title: 'Users & RBAC', icon: ShieldCheck, href: '/dashboard/users' },
@@ -99,8 +106,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { title: 'Admissions', icon: UserPlus, href: '/dashboard/admissions', badge: '12' },
         { title: 'Pupil Management', icon: Users, href: '/dashboard/students' },
-        { title: 'Parent Portal', icon: Heart, href: '/dashboard/parent-portal' },
-        { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr' },
+        { title: 'Parent Portal', icon: Heart, href: '/dashboard/parent-portal', visible: isAdmin },
+        { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr', visible: isAdmin },
       ]
     },
     {
@@ -118,19 +125,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       label: 'OPERATIONS',
       color: 'text-green-400',
       items: [
-        { title: 'Finance & Billing', icon: DollarSign, href: '/dashboard/finance', badge: '5' },
+        { title: 'Finance & Billing', icon: DollarSign, href: '/dashboard/finance', visible: isAdmin },
         { title: 'Transport', icon: Bus, href: '/dashboard/transport' },
         { title: 'Meals & Catering', icon: UtensilsCrossed, href: '/dashboard/catering' },
         { title: 'Health & Safety', icon: Stethoscope, href: '/dashboard/health' },
-        { title: 'Inventory & Assets', icon: Package, href: '/dashboard/inventory' },
+        { title: 'Inventory & Assets', icon: Package, href: '/dashboard/inventory', visible: isAdmin },
       ]
     },
     {
       label: 'INTELLIGENCE',
       color: 'text-rose-400',
       items: [
-        { title: 'Communication', icon: MessageSquare, href: '/dashboard/communication', badge: '8' },
-        { title: 'Analytics & Reports', icon: ChartColumn, href: '/dashboard/analytics' },
+        { title: 'Communication', icon: MessageSquare, href: '/dashboard/communication' },
+        { title: 'Analytics & Reports', icon: ChartColumn, href: '/dashboard/analytics', visible: isAdmin },
         { title: 'Document Builder', icon: FileText, href: '/dashboard/documents' },
         { title: 'AI & Automation', icon: Brain, href: '/dashboard/ai' },
       ]
@@ -138,12 +145,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       label: 'SYSTEM',
       color: 'text-gray-400',
+      visible: isAdmin,
       items: [
         { title: 'Integrations', icon: Globe, href: '/dashboard/integrations' },
         { title: 'System Admin', icon: Settings, href: '/dashboard/settings' },
       ]
     }
   ];
+
+  // Navigation for Parents
+  const parentNav = [
+    {
+      label: 'MY FAMILY',
+      color: 'text-teal-400',
+      items: [
+        { title: 'Parent Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+        { title: 'My Children', icon: Users, href: '/dashboard/parent-portal' },
+      ]
+    },
+    {
+      label: 'ACADEMIC',
+      color: 'text-amber-400',
+      items: [
+        { title: 'ECD Progress', icon: Baby, href: '/dashboard/ecd' },
+        { title: 'Timetable', icon: Calendar, href: '/dashboard/calendar' },
+        { title: 'Attendance', icon: ClipboardCheck, href: '/dashboard/attendance' },
+      ]
+    },
+    {
+      label: 'SCHOOL SERVICES',
+      color: 'text-green-400',
+      items: [
+        { title: 'Fees & Payments', icon: DollarSign, href: '/dashboard/finance' },
+        { title: 'School Bus', icon: Bus, href: '/dashboard/transport' },
+        { title: 'Catering', icon: UtensilsCrossed, href: '/dashboard/catering' },
+        { title: 'Health Records', icon: Stethoscope, href: '/dashboard/health' },
+      ]
+    },
+    {
+      label: 'COMMUNICATION',
+      color: 'text-rose-400',
+      items: [
+        { title: 'Messages', icon: MessageSquare, href: '/dashboard/communication', badge: '3' },
+        { title: 'Documents', icon: FileText, href: '/dashboard/documents' },
+      ]
+    }
+  ];
+
+  const currentNav = isParent ? parentNav : adminNav;
 
   return (
     <div className="flex h-screen bg-[#F8F9FC] overflow-hidden">
@@ -170,21 +219,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="mt-3 relative">
-            <button className="w-full flex items-center gap-2 px-2.5 py-2 bg-[#1A2742] rounded-lg border border-[#1E3A5F]/50 hover:border-teal-500/30 transition-colors group">
-              <div className="w-5 h-5 rounded flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0 bg-teal-600">
-                SA
+            <div className="w-full flex items-center gap-2 px-2.5 py-2 bg-[#1A2742] rounded-lg border border-[#1E3A5F]/50">
+              <div className={`w-5 h-5 rounded flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0 ${isParent ? 'bg-rose-600' : 'bg-teal-600'}`}>
+                {profile.role?.substring(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-[10px] text-gray-400 truncate">Sunrise Academy</p>
-                <p className="text-[9px] text-gray-600 truncate">Main Campus - Harare</p>
+                <p className="text-[10px] text-gray-400 truncate uppercase font-bold tracking-tighter">{profile.role} Portal</p>
+                <p className="text-[9px] text-gray-600 truncate">{profile.email}</p>
               </div>
-              <ChevronsUpDown className="h-3 w-3 text-gray-500 group-hover:text-gray-400 flex-shrink-0" />
-            </button>
-          </div>
-
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
-            <span className="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-400 font-medium text-[10px]">2026</span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium text-[10px]">Term 1</span>
+            </div>
           </div>
         </div>
 
@@ -192,45 +235,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
             <Input 
-              placeholder="Search modules..." 
+              placeholder="Quick jump..." 
               className="w-full bg-[#1A2742] text-gray-300 text-xs rounded-lg pl-8 py-2 border border-[#1E3A5F]/50 focus:border-teal-500/50 focus:ring-0 placeholder:text-gray-600 h-9"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pb-4 custom-scrollbar">
-          {navGroups.map((group) => (
-            <div key={group.label} className="mb-1">
-              <button className="w-full flex items-center justify-between px-2 py-2 text-[10px] font-semibold tracking-wider hover:bg-white/5 rounded-lg transition-colors">
-                <span className={group.color}>{group.label}</span>
-                <ChevronDown className="h-3 w-3 text-gray-600" />
-              </button>
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link 
-                      key={item.title} 
-                      href={item.href}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all duration-200 group ${
-                        isActive 
-                          ? 'bg-gradient-to-r from-teal-500/20 to-transparent text-teal-400 border-l-2 border-teal-400' 
-                          : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-                      }`}
-                    >
-                      <item.icon className={`h-4.5 w-4.5 ${isActive ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-400'}`} />
-                      <span className="truncate flex-1 text-left">{item.title}</span>
-                      {item.badge && (
-                        <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded-full text-[10px] font-medium">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
+          {currentNav.map((group) => {
+            if (group.visible === false) return null;
+            return (
+              <div key={group.label} className="mb-1">
+                <button className="w-full flex items-center justify-between px-2 py-2 text-[10px] font-semibold tracking-wider hover:bg-white/5 rounded-lg transition-colors">
+                  <span className={group.color}>{group.label}</span>
+                  <ChevronDown className="h-3 w-3 text-gray-600" />
+                </button>
+                <div className="space-y-0.5">
+                  {group.items.map((item: any) => {
+                    if (item.visible === false) return null;
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link 
+                        key={item.title} 
+                        href={item.href}
+                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all duration-200 group ${
+                          isActive 
+                            ? 'bg-gradient-to-r from-teal-500/20 to-transparent text-teal-400 border-l-2 border-teal-400' 
+                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                        }`}
+                      >
+                        <item.icon className={`h-4.5 w-4.5 ${isActive ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-400'}`} />
+                        <span className="truncate flex-1 text-left">{item.title}</span>
+                        {item.badge && (
+                          <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded-full text-[10px] font-medium">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="p-3 border-t border-[#1E3A5F]/50">
@@ -256,37 +303,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="h-4.5 w-4.5" />
             </button>
             <div>
-              <h1 className="text-sm font-semibold text-gray-800">Dashboard</h1>
-              <p className="text-[10px] text-gray-400">Sunrise Academy - Main Campus</p>
+              <h1 className="text-sm font-semibold text-gray-800">
+                {pathname.split('/').pop()?.replace(/-/g, ' ').toUpperCase() || 'DASHBOARD'}
+              </h1>
+              <p className="text-[10px] text-gray-400 capitalize">{profile.role} Access • Sunrise Academy</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
-              <Search className="h-4.5 w-4.5" />
+            <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
+              <Bell className="h-4.5 w-4.5" />
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-medium border border-white">
+                {isParent ? '2' : '4'}
+              </span>
             </button>
-            <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors hidden md:flex">
-              <HelpCircle className="h-4.5 w-4.5" />
-            </button>
-            <div className="relative">
-              <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
-                <Bell className="h-4.5 w-4.5" />
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-medium border border-white">4</span>
-              </button>
-            </div>
             <div className="flex items-center gap-2 ml-4 border-l border-gray-100 pl-4">
               <div className="text-right hidden sm:block">
-                <p className="text-[11px] font-bold text-gray-800 leading-none">{user?.email?.split('@')[0]}</p>
-                <p className="text-[9px] text-gray-400 mt-0.5">Admin Staff</p>
+                <p className="text-[11px] font-bold text-gray-800 leading-none">{profile.displayName || profile.email?.split('@')[0]}</p>
+                <p className="text-[9px] text-gray-400 mt-0.5 capitalize">{profile.role}</p>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={handleSignOut}
-                className="text-gray-400 hover:text-red-600 hover:bg-red-50"
-              >
-                <LogOut className="h-4.5 w-4.5" />
-              </Button>
+              <UserCircle className="h-8 w-8 text-gray-200" />
             </div>
           </div>
         </header>
