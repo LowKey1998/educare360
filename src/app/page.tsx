@@ -19,7 +19,7 @@ export default function SigninPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'admin' | 'staff' | 'parent'>('staff');
+  const [role, setRole] = useState<'admin' | 'staff' | 'parent'>('parent');
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
@@ -38,18 +38,22 @@ export default function SigninPage() {
       const data = snapshot.val();
       if (!data) {
         setAdminExists(false);
-        setRole('admin'); // Default to admin for the very first user
+        setRole('admin'); 
         return;
       }
       const hasAdmin = Object.values(data).some((u: any) => u.role === 'admin');
       setAdminExists(hasAdmin);
-      // If admin exists and we were selecting admin, switch to staff
-      if (hasAdmin && role === 'admin') {
-        setRole('staff');
+      
+      // Enforce roles: If admin exists, publics can only be parents.
+      // If no admin exists, first user MUST be admin.
+      if (hasAdmin) {
+        setRole('parent');
+      } else {
+        setRole('admin');
       }
     });
     return () => unsubscribe();
-  }, [database, role]);
+  }, [database]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,11 +115,6 @@ export default function SigninPage() {
     );
   }
 
-  // Filter roles based on whether an admin already exists
-  const signupRoles = adminExists 
-    ? (['staff', 'parent'] as const) 
-    : (['admin', 'staff', 'parent'] as const);
-
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center p-6 selection:bg-teal-500/30">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
@@ -136,7 +135,7 @@ export default function SigninPage() {
           <p className="text-sm text-white/80 relative z-10 leading-relaxed">
             {mode === 'signin' 
               ? 'Enter your credentials to access the institution dashboard.' 
-              : 'Register your new institution account to begin onboarding.'}
+              : 'Register your new account to begin using the platform.'}
           </p>
         </div>
 
@@ -184,28 +183,18 @@ export default function SigninPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Assign Role</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {signupRoles.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRole(r)}
-                      className={`py-2 px-1 rounded-lg border text-[10px] font-bold uppercase transition-all ${
-                        role === r 
-                          ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm' 
-                          : 'border-gray-100 text-gray-400 hover:border-gray-200'
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-                {!adminExists && mode === 'signup' && (
-                  <p className="text-[9px] text-amber-600 font-medium bg-amber-50 p-1.5 rounded mt-1">
-                    No admin detected. First user must register as Administrator.
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Account Role</label>
+                <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-teal-700 uppercase">{role}</span>
+                    <span className="text-[9px] text-teal-600/70 font-medium">Auto-assigned</span>
+                  </div>
+                  <p className="text-[10px] text-teal-600 mt-1">
+                    {role === 'admin' 
+                      ? 'No administrator found. You are registering as the system owner.' 
+                      : 'Registering as a Parent to track student progress.'}
                   </p>
-                )}
+                </div>
               </div>
             </>
           )}
@@ -216,7 +205,7 @@ export default function SigninPage() {
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-teal-500 transition-colors" />
               <input 
                 type="email" 
-                placeholder="admin@sunrise.edu" 
+                placeholder="email@example.com" 
                 required 
                 className="w-full bg-white pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
                 value={email}
@@ -260,9 +249,11 @@ export default function SigninPage() {
             )}
           </button>
 
-          <div className="pt-4 border-t border-gray-50">
+          <div className="pt-4 border-t border-gray-100">
             <p className="text-center text-[10px] text-gray-400 italic leading-relaxed">
-              Powered by Firebase Realtime DB. Roles determine institutional access.
+              {mode === 'signup' && adminExists 
+                ? 'Staff and Admin accounts must be created by an existing administrator.' 
+                : 'Powered by Firebase Realtime DB. Roles determine institutional access.'}
             </p>
           </div>
         </form>
