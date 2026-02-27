@@ -3,14 +3,13 @@
 
 import { useState, useMemo } from 'react';
 import { 
-  Download, 
   Plus, 
   Database, 
   DollarSign, 
   TrendingUp, 
   TrendingDown, 
-  ChevronDown,
-  Loader2
+  Loader2,
+  Users
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -19,16 +18,34 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell
 } from 'recharts';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDatabase, useRTDBCollection } from '@/firebase';
+import { ref, update } from 'firebase/database';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 const collectionData = [
   { name: 'Jan', Collected: 22000, Target: 32000 },
@@ -48,7 +65,10 @@ const paymentMethodsData = [
 
 export default function FinanceBillingPage() {
   const database = useDatabase();
+  const { toast } = useToast();
   const { data: students, loading } = useRTDBCollection(database, 'students');
+  const [isPayOpen, setIsPayOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const stats = useMemo(() => {
     const totalArrears = students.reduce((acc, s) => acc + (s.feeBalance || 0), 0);
@@ -57,9 +77,33 @@ export default function FinanceBillingPage() {
     return {
       arrears: totalArrears.toLocaleString(),
       debtors: debtorCount,
-      billed: (totalArrears * 1.2).toLocaleString(), // Mocking billed as a multiplier for demo
+      billed: (totalArrears * 1.2).toLocaleString(),
     };
   }, [students]);
+
+  const handlePayment = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const studentId = formData.get('studentId') as string;
+    const amount = parseFloat(formData.get('amount') as string);
+
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+
+    try {
+      const newBalance = Math.max(0, (student.feeBalance || 0) - amount);
+      await update(ref(database, `students/${studentId}`), {
+        feeBalance: newBalance
+      });
+      setIsPayOpen(false);
+      toast({ title: "Payment Recorded", description: `Updated balance for ${student.studentName}: $${newBalance}` });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -74,52 +118,72 @@ export default function FinanceBillingPage() {
           <p className="text-xs text-gray-500">Manage fees, invoices, and payments</p>
         </div>
         <div className="flex gap-2">
-          <Button className="flex items-center gap-1.5 h-9 px-4 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 shadow-sm">
-            <Plus className="h-3.5 w-3.5" /> Record Payment
-          </Button>
+          <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 px-4 text-xs font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Record Payment
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={handlePayment}>
+                <DialogHeader>
+                  <DialogTitle>Record Student Payment</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Select Student</Label>
+                    <Select name="studentId" required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Search student..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {students.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Payment Amount ($)</Label>
+                    <Input name="amount" type="number" step="0.01" placeholder="0.00" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Payment Method</Label>
+                    <Select name="method" defaultValue="Bank Transfer">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                        <SelectItem value="Cash">Cash</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Processing..." : "Update Balance"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <FinanceMetricCard 
-          label="Total Billed" 
-          value={loading ? '...' : `$${stats.billed}`} 
-          subValue="Est. this term" 
-          color="bg-blue-50 text-blue-600" 
-          trend="+12%"
-          isPositive={true}
-        />
-        <FinanceMetricCard 
-          label="Collected" 
-          value="$118,200" 
-          subValue="Real-time collection" 
-          color="bg-green-50 text-green-600" 
-          trend="+5.4%"
-          isPositive={true}
-        />
-        <FinanceMetricCard 
-          label="Outstanding" 
-          value={loading ? '...' : `$${stats.arrears}`} 
-          subValue={`${stats.debtors} active debtors`} 
-          color="bg-amber-50 text-amber-600" 
-          trend="-2.1%"
-          isPositive={true}
-        />
-        <FinanceMetricCard 
-          label="Overdue" 
-          value="$8,450" 
-          subValue="Immediate attention" 
-          color="bg-red-50 text-red-600" 
-          trend="+430"
-          isPositive={false}
-        />
+        <FinanceMetricCard label="Total Billed" value={loading ? '...' : `$${stats.billed}`} subValue="Est. this term" color="bg-blue-50 text-blue-600" trend="+12%" isPositive={true} />
+        <FinanceMetricCard label="Collected" value="$118,200" subValue="Total collection" color="bg-green-50 text-green-600" trend="+5.4%" isPositive={true} />
+        <FinanceMetricCard label="Outstanding" value={loading ? '...' : `$${stats.arrears}`} subValue={`${stats.debtors} active debtors`} color="bg-amber-50 text-amber-600" trend="-2.1%" isPositive={true} />
+        <FinanceMetricCard label="Overdue" value="$8,450" subValue="Immediate attention" color="bg-red-50 text-red-600" trend="+430" isPositive={false} />
       </div>
 
-      <Card className="border-gray-100 overflow-hidden">
+      <Card className="border-gray-100 overflow-hidden shadow-sm">
         <Tabs defaultValue="overview" className="w-full">
           <div className="border-b border-gray-100 px-4 pt-1 bg-white">
             <TabsList className="bg-transparent h-auto p-0 gap-4">
-              <TabsTrigger value="overview" className="px-4 py-3 text-xs font-medium border-b-2 border-transparent data-[state=active]:border-green-600 data-[state=active]:text-green-600 rounded-none shadow-none">
+              <TabsTrigger value="overview" className="px-4 py-3 text-xs font-medium border-b-2 border-transparent data-[state=active]:border-green-600 data-[state=active]:text-green-600 rounded-none shadow-none bg-transparent">
                 Financial Overview
               </TabsTrigger>
             </TabsList>

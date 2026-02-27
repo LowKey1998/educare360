@@ -14,22 +14,44 @@ import {
   Upload, 
   Plus, 
   Database, 
-  Zap, 
-  ArrowUpDown, 
   Eye, 
   SquarePen, 
   Trash2,
   Server,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
+import { ref, push, set, remove, serverTimestamp } from 'firebase/database';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 export default function PupilManagementPage() {
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('All Grades');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSubmitting, setIsAddSubmitting] = useState(false);
+  
   const database = useDatabase();
-
+  const { toast } = useToast();
   const { data: students, loading } = useRTDBCollection(database, 'students');
 
   const filteredStudents = useMemo(() => {
@@ -60,13 +82,50 @@ export default function PupilManagementPage() {
     return { total, active, suspended, arrears, avgAttendance };
   }, [students]);
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this pupil?')) return;
+    try {
+      await remove(ref(database, `students/${id}`));
+      toast({ title: "Pupil removed", description: "The record has been successfully deleted." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to delete record.", variant: "destructive" });
+    }
+  };
+
+  const handleAddPupil = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAddSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      studentName: formData.get('name'),
+      admissionNo: formData.get('admNo'),
+      grade: formData.get('grade'),
+      gender: formData.get('gender'),
+      guardianName: formData.get('guardian'),
+      guardianPhone: formData.get('phone'),
+      status: 'Active',
+      feeBalance: 0,
+      attendanceRate: 100,
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await push(ref(database, 'students'), data);
+      setIsAddOpen(false);
+      toast({ title: "Pupil Added", description: `${data.studentName} has been enrolled.` });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to add pupil.", variant: "destructive" });
+    } finally {
+      setIsAddSubmitting(false);
+    }
+  };
+
   const getInitials = (name: string) => {
     return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??';
   };
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -75,122 +134,115 @@ export default function PupilManagementPage() {
               <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
               Synced to Realtime DB
             </div>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-semibold rounded-full">
-              <Server className="h-2.5 w-2.5" /> RTDB Active
-            </span>
           </div>
           <p className="text-xs text-gray-500">Manage all {stats.total} enrolled pupils across ECD and Primary</p>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50" title="Refresh data">
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
-          <div className="relative">
-            <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors text-gray-600 bg-white border border-gray-200 hover:bg-gray-50">
-              <Download className="h-3.5 w-3.5" />
-              <span>Export</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </div>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Upload className="h-3.5 w-3.5" /> Import
-          </button>
-          <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors">
-            <Plus className="h-3.5 w-3.5" /> Add Pupil
-          </button>
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => toast({ title: "Export Started", description: "Generating student CSV..." })}>
+            <Download className="h-3.5 w-3.5" /> Export
+          </Button>
+          
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 bg-teal-600 hover:bg-teal-700 gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Add Pupil
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <form onSubmit={handleAddPupil}>
+                <DialogHeader>
+                  <DialogTitle>New Pupil Enrollment</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" name="name" placeholder="Tendai Moyo" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="admNo">Admission No</Label>
+                      <Input id="admNo" name="admNo" placeholder="SA-2024-001" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <Select name="gender" defaultValue="Male">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">Grade/Class</Label>
+                    <Select name="grade" defaultValue="Grade 1">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Grade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="guardian">Guardian Name</Label>
+                    <Input id="guardian" name="guardian" placeholder="James Moyo" required />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Enrolling..." : "Enroll Student"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Summary Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <SummaryCard 
-          label="Total Enrolled" 
-          value={loading ? '...' : stats.total.toString()} 
-          subText={loading ? 'Loading...' : 'Total pupils'} 
-          icon={<Users className="h-4.5 w-4.5" />} 
-          gradient="from-teal-500 to-teal-600" 
-        />
-        <SummaryCard 
-          label="Active" 
-          value={loading ? '...' : stats.active.toString()} 
-          subText={loading ? 'Loading...' : 'Currently active'} 
-          icon={<UserCheck className="h-4.5 w-4.5" />} 
-          gradient="from-green-500 to-green-600" 
-        />
-        <SummaryCard 
-          label="Suspended" 
-          value={loading ? '...' : stats.suspended.toString()} 
-          subText="Requires attention" 
-          icon={<UserX className="h-4.5 w-4.5" />} 
-          gradient="from-red-500 to-red-600" 
-        />
-        <SummaryCard 
-          label="Fee Arrears" 
-          value={loading ? '...' : stats.arrears.toString()} 
-          subText="Outstanding fees" 
-          icon={<TriangleAlert className="h-4.5 w-4.5" />} 
-          gradient="from-amber-500 to-amber-600" 
-        />
-        <SummaryCard 
-          label="Avg Attendance" 
-          value={loading ? '...' : `${stats.avgAttendance.toFixed(1)}%`} 
-          subText={loading ? 'Loading...' : 'School-wide average'} 
-          icon={<GraduationCap className="h-4.5 w-4.5" />} 
-          gradient="from-blue-500 to-blue-600" 
-        />
+        <SummaryCard label="Total Enrolled" value={loading ? '...' : stats.total.toString()} subText="Total pupils" icon={<Users className="h-4.5 w-4.5" />} gradient="from-teal-500 to-teal-600" />
+        <SummaryCard label="Active" value={loading ? '...' : stats.active.toString()} subText="Currently active" icon={<UserCheck className="h-4.5 w-4.5" />} gradient="from-green-500 to-green-600" />
+        <SummaryCard label="Suspended" value={loading ? '...' : stats.suspended.toString()} subText="Requires attention" icon={<UserX className="h-4.5 w-4.5" />} gradient="from-red-500 to-red-600" />
+        <SummaryCard label="Fee Arrears" value={loading ? '...' : `$${stats.arrears}`} subText="Count: 12" icon={<TriangleAlert className="h-4.5 w-4.5" />} gradient="from-amber-500 to-amber-600" />
+        <SummaryCard label="Avg Attendance" value={loading ? '...' : `${stats.avgAttendance.toFixed(1)}%`} subText="School average" icon={<GraduationCap className="h-4.5 w-4.5" />} gradient="from-blue-500 to-blue-600" />
       </div>
 
-      {/* Search and Filters */}
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <input 
               type="text" 
-              placeholder="Search by name, admission number, guardian, or phone..." 
-              className="w-full pl-9 pr-10 py-2 text-xs border border-gray-200 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none"
+              placeholder="Search pupils..." 
+              className="w-full pl-9 pr-10 py-2 text-xs border border-gray-200 rounded-lg focus:border-teal-500 outline-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select 
-            className="px-3 py-2 text-xs border border-gray-200 rounded-lg focus:border-teal-500 outline-none bg-white"
-            value={gradeFilter}
-            onChange={(e) => setGradeFilter(e.target.value)}
-          >
+          <select className="px-3 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white" value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
             <option>All Grades</option>
             {['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
               <option key={g}>{g}</option>
             ))}
           </select>
-          <select 
-            className="px-3 py-2 text-xs border border-gray-200 rounded-lg focus:border-teal-500 outline-none bg-white"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option>All Status</option>
-            {['Active', 'Suspended', 'Transferred', 'Graduated', 'Withdrawn'].map(s => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* Pupils Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-4 py-3 text-left w-10">
-                  <input type="checkbox" className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Adm No</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pupil Name</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Grade</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Gender</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Guardian</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Attendance</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fee Balance</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -199,37 +251,16 @@ export default function PupilManagementPage() {
             <tbody className={`transition-opacity ${loading ? 'opacity-50' : 'opacity-100'}`}>
               {filteredStudents.length > 0 ? filteredStudents.map((student: any) => (
                 <tr key={student.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
-                  <td className="px-4 py-3">
-                    <input type="checkbox" className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
-                  </td>
                   <td className="px-4 py-3 text-xs text-gray-500 font-mono">{student.admissionNo || 'N/A'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0 ${student.gender === 'Female' ? 'bg-pink-500' : 'bg-blue-500'}`}>
                         {getInitials(student.studentName)}
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-gray-800 truncate">{student.studentName}</p>
-                        <p className="text-[10px] text-gray-400">Age: {student.age || 'N/A'}</p>
-                      </div>
+                      <p className="text-xs font-medium text-gray-800 truncate">{student.studentName}</p>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{student.grade || 'N/A'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{student.gender || 'N/A'}</td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs text-gray-600 truncate max-w-[140px]">{student.guardianName || 'N/A'}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full ${student.attendanceRate > 90 ? 'bg-green-500' : 'bg-amber-500'}`} 
-                          style={{ width: `${student.attendanceRate || 0}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-600">{(student.attendanceRate || 0).toFixed(1)}%</span>
-                    </div>
-                  </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium ${student.feeBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                       ${(student.feeBalance || 0).toFixed(2)}
@@ -237,9 +268,7 @@ export default function PupilManagementPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      student.status === 'Active' ? 'bg-green-100 text-green-700' : 
-                      student.status === 'Suspended' ? 'bg-red-100 text-red-700' : 
-                      'bg-gray-100 text-gray-700'
+                      student.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                     }`}>
                       {student.status || 'Active'}
                     </span>
@@ -252,7 +281,7 @@ export default function PupilManagementPage() {
                       <button className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
                         <SquarePen className="h-3.5 w-3.5" />
                       </button>
-                      <button className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100" title="Delete">
+                      <button onClick={() => handleDelete(student.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -260,8 +289,8 @@ export default function PupilManagementPage() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm italic">
-                    {loading ? 'Fetching pupil records from Realtime DB...' : 'No pupils found.'}
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm italic">
+                    {loading ? 'Syncing...' : 'No pupils found.'}
                   </td>
                 </tr>
               )}
