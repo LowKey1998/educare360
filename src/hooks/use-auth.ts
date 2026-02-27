@@ -19,14 +19,13 @@ export function useAuth() {
 
   useEffect(() => {
     // Simulate auth check and role detection from URL for demo purposes
-    // In a real app, this would use firebase.auth().onAuthStateChanged
     const roleParam = searchParams.get('role') as UserRole || 'admin';
     
     setTimeout(() => {
       setUser({
         id: '1',
-        name: 'Alex Rivera',
-        email: 'alex@rivera.edu',
+        name: 'Dr. Mutendi',
+        email: 'dr.mutendi@sunrise.edu',
         role: roleParam,
       });
       setLoading(false);
