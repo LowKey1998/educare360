@@ -1,6 +1,6 @@
 
 export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAXAnRB28bcBOAHnPfUL14QMV3-3MSOIGE",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||"AIzaSyAXAnRB28bcBOAHnPfUL14QMV3-3MSOIGE",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "studio-6965948217-be25a.firebaseapp.com",
   databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://studio-6965948217-be25a-default-rtdb.firebaseio.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "studio-6965948217-be25a",
