@@ -1,7 +1,7 @@
-
 "use client"
 
-import { useAuth } from '@/hooks/use-auth';
+import { useUser, useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,7 +16,6 @@ import {
   Building2,
   UserPlus,
   Briefcase,
-  Layers,
   ShieldCheck,
   Heart,
   Baby,
@@ -34,19 +33,36 @@ import {
   Brain,
   Globe,
   Menu,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  const { user, loading } = useUser();
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (!user && !loading) {
+      router.push('/');
+    }
+  }, [user, loading, router]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -58,6 +74,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
+
+  if (!user) return null;
 
   const navGroups = [
     {
@@ -216,9 +234,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <div className="p-3 border-t border-[#1E3A5F]/50">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-teal-600/20 text-teal-400 rounded-lg text-xs font-medium hover:bg-teal-600/30 transition-colors">
-            <LogIn className="h-3.5 w-3.5" />
-            Sign In to EduCare360
+          <button 
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-600/20 text-red-400 rounded-lg text-xs font-medium hover:bg-red-600/30 transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign Out
           </button>
         </div>
       </aside>
@@ -253,15 +274,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-medium border border-white">4</span>
               </button>
             </div>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-medium rounded-lg hover:bg-teal-700 transition-colors ml-2">
-              <LogIn className="h-3.5 w-3.5" />
-              Sign In
-            </button>
+            <div className="flex items-center gap-2 ml-4 border-l border-gray-100 pl-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-[11px] font-bold text-gray-800 leading-none">{user?.email?.split('@')[0]}</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">Admin Staff</p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleSignOut}
+                className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+              >
+                <LogOut className="h-4.5 w-4.5" />
+              </Button>
+            </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar bg-[#F8F9FC]">
           {children}
         </main>
       </div>
