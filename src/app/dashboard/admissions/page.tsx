@@ -2,49 +2,35 @@
 "use client"
 
 import { useState, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Table, 
-  TableHeader, 
-  TableBody, 
-  TableHead, 
-  TableRow, 
-  TableCell 
-} from '@/components/ui/table';
-import { 
-  Search, 
-  Plus, 
-  MoreHorizontal, 
-  Filter, 
-  FileCheck,
-  Eye,
-  CheckCircle2,
-  XCircle,
-  Loader2
-} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+  Plus, 
+  Search, 
+  MoreHorizontal, 
+} from 'lucide-react';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { useFirestore, useCollection } from '@/firebase';
 
+const STATUS_CONFIG: Record<string, { color: string, dot: string }> = {
+  'New': { color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+  'Under Review': { color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+  'Interview': { color: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
+  'Accepted': { color: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
+  'Waitlisted': { color: 'bg-gray-100 text-gray-700', dot: 'bg-gray-500' },
+  'Rejected': { color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+};
+
+const STATUS_LABELS = ['New', 'Under Review', 'Interview', 'Accepted', 'Waitlisted', 'Rejected'];
+
 export default function AdmissionsPage() {
+  const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
   const [search, setSearch] = useState('');
   const firestore = useFirestore();
 
   const admissionsQuery = useMemo(() => {
     if (!firestore) return null;
-    return query(
-      collection(firestore, 'admissions'),
-      orderBy('submissionDate', 'desc'),
-      limit(50)
-    );
+    return query(collection(firestore, 'admissions'), orderBy('submissionDate', 'desc'));
   }, [firestore]);
 
   const { data: applications, loading } = useCollection(admissionsQuery);
@@ -52,133 +38,126 @@ export default function AdmissionsPage() {
   const filteredApps = useMemo(() => {
     if (!applications) return [];
     return applications.filter(a => 
-      (a.studentName?.toLowerCase().includes(search.toLowerCase())) ||
-      (a.applicationId?.toLowerCase().includes(search.toLowerCase()))
+      a.studentName?.toLowerCase().includes(search.toLowerCase()) ||
+      a.applicationId?.toLowerCase().includes(search.toLowerCase())
     );
   }, [applications, search]);
 
+  const groupedApps = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    STATUS_LABELS.forEach(label => groups[label] = []);
+    filteredApps.forEach(app => {
+      const status = app.status || 'New';
+      if (groups[status]) {
+        groups[status].push(app);
+      } else {
+        // Default to 'New' if status doesn't match our categories
+        groups['New'].push(app);
+      }
+    });
+    return groups;
+  }, [filteredApps]);
+
+  const getInitials = (name: string) => {
+    return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??';
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold font-headline mb-2 text-gray-900">Admissions & Enrollment</h1>
-          <p className="text-muted-foreground">Manage incoming applications and student onboarding.</p>
+          <h2 className="text-lg font-bold text-gray-800">Admissions & Enrolment</h2>
+          <p className="text-xs text-gray-500">Manage applications, interviews, and class placement</p>
         </div>
-        <Button className="gap-2 h-11 bg-teal-600 hover:bg-teal-700">
-          <Plus className="h-5 w-5" />
-          New Application
-        </Button>
+        <div className="flex gap-2">
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            <button 
+              onClick={() => setView('pipeline')}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${view === 'pipeline' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500'}`}
+            >
+              Pipeline
+            </button>
+            <button 
+              onClick={() => setView('list')}
+              className={`px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${view === 'list' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500'}`}
+            >
+              List
+            </button>
+          </div>
+          <Button className="flex items-center gap-1.5 h-9 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white">
+            <Plus className="h-3.5 w-3.5" /> New Application
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatusBox label="Total Apps" count={applications.length} />
-        <StatusBox label="Pending" count={applications.filter(a => a.status === 'Pending').length} color="text-teal-600" />
-        <StatusBox label="Approved" count={applications.filter(a => a.status === 'Approved').length} color="text-green-500" />
-        <StatusBox label="Declined" count={applications.filter(a => a.status === 'Declined').length} color="text-destructive" />
+      {/* Summary Stats Grid */}
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+        {STATUS_LABELS.map(label => (
+          <div key={label} className="bg-white rounded-xl border border-gray-100 p-3 text-center cursor-pointer hover:shadow-md transition-all">
+            <p className="text-lg font-bold text-gray-800">{groupedApps[label]?.length || 0}</p>
+            <p className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block ${STATUS_CONFIG[label].color}`}>{label}</p>
+          </div>
+        ))}
       </div>
 
-      <Card className="border-border/50 bg-white">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                className="pl-10 h-10 border-gray-200" 
-                placeholder="Search by student or application ID..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+      {/* Search Bar */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Input 
+            className="pl-9 text-xs h-9 border-gray-200 outline-none focus:ring-1 focus:ring-blue-500" 
+            placeholder="Search applications..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Kanban Board / Pipeline */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 pb-6 overflow-x-auto custom-scrollbar">
+        {STATUS_LABELS.map(label => (
+          <div key={label} className="bg-gray-50 rounded-xl p-3 min-w-[220px] h-fit">
+            <div className="flex items-center justify-between mb-3">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_CONFIG[label].color}`}>{label}</span>
+              <span className="text-[10px] text-gray-400 font-medium">{groupedApps[label]?.length || 0}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Filter className="h-4 w-4" />
-                Filter
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2">
-                <FileCheck className="h-4 w-4" />
-                Export CSV
-              </Button>
+            
+            <div className="space-y-2">
+              {groupedApps[label]?.map((app: any) => (
+                <div key={app.id} className="bg-white rounded-lg p-2.5 border border-gray-100 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${STATUS_CONFIG[label].dot}`}>
+                      {getInitials(app.studentName)}
+                    </div>
+                    <p className="text-[11px] font-semibold text-gray-800 truncate">{app.studentName}</p>
+                  </div>
+                  <p className="text-[10px] text-gray-500">{app.grade || 'N/A'} | Age {app.age || 'N/A'}</p>
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+                    <span className="text-[9px] text-gray-400">{app.submissionDate || 'Feb 24'}</span>
+                    {app.docsPending && (
+                      <span className="text-[9px] text-red-500 font-medium italic">Docs pending</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {loading && (
+                <div className="animate-pulse space-y-2">
+                  <div className="h-16 bg-white rounded-lg border border-gray-100" />
+                  <div className="h-16 bg-white rounded-lg border border-gray-100" />
+                </div>
+              )}
+
+              {!loading && groupedApps[label]?.length === 0 && (
+                <div className="text-center py-8 text-[10px] text-gray-400 italic">
+                  Empty
+                </div>
+              )}
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin mb-4 text-teal-600" />
-              <p>Fetching real-time applications...</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Application ID</TableHead>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>Parent/Guardian</TableHead>
-                  <TableHead>Target Grade</TableHead>
-                  <TableHead>Submission Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredApps.length > 0 ? filteredApps.map((app: any) => (
-                  <TableRow key={app.id}>
-                    <TableCell className="font-mono text-xs font-semibold text-teal-600">{app.applicationId || 'N/A'}</TableCell>
-                    <TableCell className="font-medium">{app.studentName}</TableCell>
-                    <TableCell>{app.parentName}</TableCell>
-                    <TableCell>{app.grade}</TableCell>
-                    <TableCell className="text-muted-foreground">{app.submissionDate || 'N/A'}</TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        app.status === 'Approved' ? 'default' : 
-                        app.status === 'Declined' ? 'destructive' : 
-                        'outline'
-                      } className="px-2.5">
-                        {app.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem className="gap-2 cursor-pointer">
-                            <Eye className="h-4 w-4" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 cursor-pointer text-green-500 focus:text-green-500">
-                            <CheckCircle2 className="h-4 w-4" /> Approve
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive">
-                            <XCircle className="h-4 w-4" /> Decline
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No applications found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function StatusBox({ label, count, color }: { label: string, count: number, color?: string }) {
-  return (
-    <div className="p-4 rounded-xl border border-border/50 bg-white flex flex-col justify-center items-center shadow-sm">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">{label}</p>
-      <h4 className={`text-2xl font-bold font-headline ${color || 'text-gray-900'}`}>{count}</h4>
+        ))}
+      </div>
     </div>
   );
 }
