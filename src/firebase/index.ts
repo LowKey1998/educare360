@@ -3,31 +3,31 @@
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getDatabase, Database } from 'firebase/database';
 import { firebaseConfig } from './config';
 
 let app: FirebaseApp;
 let auth: Auth;
-let firestore: Firestore;
+let database: Database;
 
 export function initializeFirebase() {
   if (getApps().length === 0) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
-    firestore = getFirestore(app);
+    database = getDatabase(app);
   } else {
     app = getApps()[0];
     auth = getAuth(app);
-    firestore = getFirestore(app);
+    database = getDatabase(app);
   }
-  return { app, auth, firestore };
+  return { app, auth, database };
 }
 
 export const getFirebaseApp = () => app;
 export const getAuthInstance = () => auth;
-export const getFirestoreInstance = () => firestore;
+export const getDatabaseInstance = () => database;
 
-export { FirebaseProvider, useFirebase, useAuth, useFirestore } from './provider';
+export { FirebaseProvider, useFirebase, useAuth, useDatabase } from './provider';
 export { useUser } from './auth/use-user';
-export { useCollection } from './firestore/use-collection';
-export { useDoc } from './firestore/use-doc';
+export { useRTDBCollection } from './database/use-collection';
+export { useRTDBDoc } from './database/use-doc';

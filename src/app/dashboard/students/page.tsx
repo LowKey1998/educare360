@@ -22,21 +22,15 @@ import {
   Server,
   ChevronDown
 } from 'lucide-react';
-import { collection, query, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection } from '@/firebase';
 
 export default function PupilManagementPage() {
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('All Grades');
   const [statusFilter, setStatusFilter] = useState('All Status');
-  const firestore = useFirestore();
+  const database = useDatabase();
 
-  const studentsQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'students'), orderBy('studentName', 'asc'));
-  }, [firestore]);
-
-  const { data: students, loading } = useCollection(studentsQuery);
+  const { data: students, loading } = useRTDBCollection(database, 'students');
 
   const filteredStudents = useMemo(() => {
     if (!students) return [];
@@ -79,10 +73,10 @@ export default function PupilManagementPage() {
             <h2 className="text-lg font-bold text-gray-800">Pupil Information Management</h2>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-green-50 text-green-600">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-              Synced to database
+              Synced to Realtime DB
             </div>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-semibold rounded-full">
-              <Server className="h-2.5 w-2.5" /> Server Query
+              <Server className="h-2.5 w-2.5" /> RTDB Active
             </span>
           </div>
           <p className="text-xs text-gray-500">Manage all {stats.total} enrolled pupils across ECD and Primary</p>
@@ -179,22 +173,6 @@ export default function PupilManagementPage() {
               <option key={s}>{s}</option>
             ))}
           </select>
-          <select className="px-3 py-2 text-xs border border-gray-200 rounded-lg focus:border-teal-500 outline-none bg-white">
-            <option value="10">10 per page</option>
-            <option value="25">25 per page</option>
-            <option value="50">50 per page</option>
-          </select>
-        </div>
-        <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-400">
-          <div className="flex items-center gap-1">
-            <Database className="h-2.5 w-2.5" />
-            <span>Showing {filteredStudents.length} of {students?.length || 0} filtered records</span>
-          </div>
-          <span className="text-gray-300">|</span>
-          <div className="flex items-center gap-1">
-            <Zap className="h-2.5 w-2.5 text-indigo-400" />
-            <span className="text-indigo-400">Server-side query with .ilike(), .eq(), .range() operators</span>
-          </div>
         </div>
       </div>
 
@@ -205,35 +183,15 @@ export default function PupilManagementPage() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="px-4 py-3 text-left w-10">
-                  <input type="checkbox" class="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                  <input type="checkbox" className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
                 </th>
-                <th className="px-4 py-3 text-left">
-                  <button className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
-                    Adm No <ArrowUpDown className="h-2.5 w-2.5" />
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <button className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
-                    Pupil Name <ArrowUpDown className="h-2.5 w-2.5 text-teal-600" />
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <button className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
-                    Grade <ArrowUpDown className="h-2.5 w-2.5" />
-                  </button>
-                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Adm No</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pupil Name</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Grade</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Gender</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Guardian</th>
-                <th className="px-4 py-3 text-left">
-                  <button className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
-                    Attendance <ArrowUpDown className="h-2.5 w-2.5" />
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <button className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
-                    Fee Balance <ArrowUpDown className="h-2.5 w-2.5" />
-                  </button>
-                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Attendance</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fee Balance</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -252,7 +210,7 @@ export default function PupilManagementPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-gray-800 truncate">{student.studentName}</p>
-                        <p className="text-[10px] text-gray-400">Age: {student.age || 'N/A'} | DOB: {student.dob || 'N/A'}</p>
+                        <p className="text-[10px] text-gray-400">Age: {student.age || 'N/A'}</p>
                       </div>
                     </div>
                   </td>
@@ -260,7 +218,6 @@ export default function PupilManagementPage() {
                   <td className="px-4 py-3 text-xs text-gray-600">{student.gender || 'N/A'}</td>
                   <td className="px-4 py-3">
                     <p className="text-xs text-gray-600 truncate max-w-[140px]">{student.guardianName || 'N/A'}</p>
-                    <p className="text-[10px] text-gray-400 truncate max-w-[140px]">{student.guardianPhone || 'N/A'}</p>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -270,7 +227,7 @@ export default function PupilManagementPage() {
                           style={{ width: `${student.attendanceRate || 0}%` }}
                         />
                       </div>
-                      <span className="text-xs text-gray-600">{(student.attendanceRate || 0).toFixed(2)}%</span>
+                      <span className="text-xs text-gray-600">{(student.attendanceRate || 0).toFixed(1)}%</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -304,7 +261,7 @@ export default function PupilManagementPage() {
               )) : (
                 <tr>
                   <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm italic">
-                    {loading ? 'Fetching pupil records...' : 'No pupils found matching your criteria.'}
+                    {loading ? 'Fetching pupil records from Realtime DB...' : 'No pupils found.'}
                   </td>
                 </tr>
               )}
