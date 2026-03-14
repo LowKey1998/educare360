@@ -11,16 +11,32 @@ import {
   Plus, 
   MapPin, 
   Clock,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDatabase, useRTDBCollection } from '@/firebase';
+import { ref, push, remove, serverTimestamp } from 'firebase/database';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 export default function TransportManagementPage() {
   const [search, setSearch] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const database = useDatabase();
+  const { toast } = useToast();
   const { data: routes, loading } = useRTDBCollection(database, 'transport_routes');
 
   const filteredRoutes = useMemo(() => {
@@ -32,9 +48,40 @@ export default function TransportManagementPage() {
 
   const stats = useMemo(() => {
     const active = routes.filter((r: any) => r.status === 'Active').length;
-    const pupils = routes.reduce((acc: number, r: any) => acc + (r.pupils || 0), 0);
+    const pupils = routes.reduce((acc: number, r: any) => acc + (parseInt(r.pupils as string) || 0), 0);
     return { active, pupils };
   }, [routes]);
+
+  const handleAddRoute = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      area: formData.get('area'),
+      stops: parseInt(formData.get('stops') as string),
+      pupils: 0,
+      capacity: parseInt(formData.get('capacity') as string) || 35,
+      status: 'Active',
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await push(ref(database, 'transport_routes'), data);
+      setIsAddOpen(false);
+      toast({ title: "Route Added", description: `"${data.name}" is now active.` });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to create route.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Cancel this transport route?')) return;
+    await remove(ref(database, `transport_routes/${id}`));
+    toast({ title: "Removed", description: "Route deleted." });
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -44,9 +91,45 @@ export default function TransportManagementPage() {
           <p className="text-xs text-gray-500">Manage bus routes and pupil allocations</p>
         </div>
         <div className="flex gap-2">
-          <Button className="flex items-center gap-1.5 h-9 px-4 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm">
-            <Plus className="h-3.5 w-3.5" /> Add Route
-          </Button>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-1.5 h-9 px-4 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm">
+                <Plus className="h-3.5 w-3.5" /> Add Route
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={handleAddRoute}>
+                <DialogHeader>
+                  <DialogTitle>Define New Bus Route</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Route Name</Label>
+                    <Input name="name" placeholder="e.g. Route 1 - Northern Suburbs" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Area Covered</Label>
+                    <Input name="area" placeholder="e.g. Borrowdale, Mt Pleasant" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>No. of Stops</Label>
+                      <Input name="stops" type="number" placeholder="12" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Bus Capacity</Label>
+                      <Input name="capacity" type="number" placeholder="35" required />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Adding..." : "Confirm Route"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -60,11 +143,11 @@ export default function TransportManagementPage() {
       <Card className="border-gray-100 overflow-hidden shadow-sm">
         <div className="p-5">
           <div className="space-y-4">
-            <div className="relative">
+            <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <Input 
                 placeholder="Search routes..." 
-                className="pl-9 text-xs h-9 border-gray-200 outline-none focus:ring-1 focus:ring-indigo-500" 
+                className="pl-9 text-xs h-9 border-gray-200" 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -73,19 +156,22 @@ export default function TransportManagementPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-2" />
-                <p className="text-xs text-gray-400 italic">Syncing transport data...</p>
+                <p className="text-xs text-gray-400 italic">Syncing transport...</p>
               </div>
             ) : filteredRoutes.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {filteredRoutes.map((route: any) => (
-                  <div key={route.id} className="border border-gray-100 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer group">
+                  <div key={route.id} className="border border-gray-100 rounded-xl p-4 hover:shadow-md transition-all group relative">
+                    <button onClick={() => handleDelete(route.id)} className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
                           <Bus className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{route.name}</p>
+                          <p className="text-xs font-semibold text-gray-800 truncate pr-4">{route.name}</p>
                           <p className="text-[10px] text-gray-500">{route.area}</p>
                         </div>
                       </div>
@@ -105,9 +191,7 @@ export default function TransportManagementPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-400 italic text-xs">
-                No transport routes found.
-              </div>
+              <div className="text-center py-12 text-gray-400 italic text-xs">No routes found.</div>
             )}
           </div>
         </div>
