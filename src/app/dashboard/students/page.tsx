@@ -9,20 +9,15 @@ import {
   TriangleAlert, 
   GraduationCap, 
   Search, 
-  RefreshCw, 
   Download, 
-  Upload, 
   Plus, 
-  Database, 
   Eye, 
   SquarePen, 
   Trash2,
-  Server,
-  ChevronDown,
   Loader2
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, push, set, remove, serverTimestamp } from 'firebase/database';
+import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
   DialogContent, 
@@ -60,7 +55,8 @@ export default function PupilManagementPage() {
       const matchesSearch = 
         s.studentName?.toLowerCase().includes(search.toLowerCase()) ||
         s.admissionNo?.toLowerCase().includes(search.toLowerCase()) ||
-        s.guardianName?.toLowerCase().includes(search.toLowerCase());
+        s.guardianName?.toLowerCase().includes(search.toLowerCase()) ||
+        s.parentEmail?.toLowerCase().includes(search.toLowerCase());
       
       const matchesGrade = gradeFilter === 'All Grades' || s.grade?.includes(gradeFilter);
       const matchesStatus = statusFilter === 'All Status' || s.status === statusFilter;
@@ -103,6 +99,7 @@ export default function PupilManagementPage() {
       gender: formData.get('gender'),
       guardianName: formData.get('guardian'),
       guardianPhone: formData.get('phone'),
+      parentEmail: formData.get('parentEmail'),
       status: 'Active',
       feeBalance: 0,
       attendanceRate: 100,
@@ -128,13 +125,7 @@ export default function PupilManagementPage() {
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-gray-800">Pupil Information Management</h2>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-green-50 text-green-600">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-              Synced to Realtime DB
-            </div>
-          </div>
+          <h2 className="text-lg font-bold text-gray-800">Pupil Information Management</h2>
           <p className="text-xs text-gray-500">Manage all {stats.total} enrolled pupils across ECD and Primary</p>
         </div>
         <div className="flex gap-2">
@@ -172,27 +163,38 @@ export default function PupilManagementPage() {
                         <SelectContent>
                           <SelectItem value="Male">Male</SelectItem>
                           <SelectItem value="Female">Female</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="grade">Grade/Class</Label>
-                    <Select name="grade" defaultValue="Grade 1">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Grade" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
-                          <SelectItem key={g} value={g}>{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="grade">Grade/Class</Label>
+                      <Select name="grade" defaultValue="Grade 1">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
+                            <SelectItem key={g} value={g}>{g}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="parentEmail">Parent Email (for login)</Label>
+                      <Input id="parentEmail" name="parentEmail" type="email" placeholder="james@example.com" required />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="guardian">Guardian Name</Label>
-                    <Input id="guardian" name="guardian" placeholder="James Moyo" required />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="guardian">Guardian Name</Label>
+                      <Input id="guardian" name="guardian" placeholder="James Moyo" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Guardian Phone</Label>
+                      <Input id="phone" name="phone" placeholder="+263 7..." required />
+                    </div>
                   </div>
                 </div>
                 <DialogFooter>
@@ -220,7 +222,7 @@ export default function PupilManagementPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <input 
               type="text" 
-              placeholder="Search pupils..." 
+              placeholder="Search by name, ID, or guardian..." 
               className="w-full pl-9 pr-10 py-2 text-xs border border-gray-200 rounded-lg focus:border-teal-500 outline-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -243,8 +245,8 @@ export default function PupilManagementPage() {
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Adm No</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pupil Name</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Grade</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Guardian</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fee Balance</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -262,24 +264,18 @@ export default function PupilManagementPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{student.grade || 'N/A'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${student.feeBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      ${(student.feeBalance || 0).toFixed(2)}
-                    </span>
+                    <p className="text-xs text-gray-700">{student.guardianName}</p>
+                    <p className="text-[10px] text-gray-400">{student.parentEmail}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      student.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {student.status || 'Active'}
+                    <span className={`text-xs font-medium ${student.feeBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      ${(student.feeBalance || 0).toFixed(2)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button className="p-1.5 rounded-lg hover:bg-teal-50 text-gray-400 hover:text-teal-600 transition-colors" title="View">
                         <Eye className="h-3.5 w-3.5" />
-                      </button>
-                      <button className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
-                        <SquarePen className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => handleDelete(student.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />
@@ -307,7 +303,7 @@ function SummaryCard({ label, value, subText, icon, gradient }: any) {
     <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-2">
         <p className="text-[11px] font-medium text-gray-500">{label}</p>
-        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white`}>
+        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-sm`}>
           {icon}
         </div>
       </div>
