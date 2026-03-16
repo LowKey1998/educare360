@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useUserProfile, useAuth, useDatabase, useRTDBDoc } from '@/firebase';
+import { useUserProfile, useAuth, useDatabase, useRTDBDoc, useRTDBCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { 
   LayoutDashboard, 
@@ -37,13 +37,18 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const database = useDatabase();
   const { profile, loading } = useUserProfile();
   const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  
+  // Fetch collections for real-time counts
+  const { data: admissions } = useRTDBCollection(database, 'admissions');
+  const { data: announcements } = useRTDBCollection(database, 'announcements');
+  
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -62,6 +67,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       console.error('Error signing out:', error);
     }
   };
+
+  const newAdmissionsCount = useMemo(() => {
+    return admissions.filter(a => a.status === 'New').length;
+  }, [admissions]);
+
+  const announcementsCount = useMemo(() => {
+    return announcements.length;
+  }, [announcements]);
 
   if (loading) {
     return (
@@ -100,7 +113,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       label: 'PEOPLE',
       color: 'text-purple-400',
       items: [
-        { title: 'Admissions', icon: UserPlus, href: '/dashboard/admissions', badge: '12' },
+        { title: 'Admissions', icon: UserPlus, href: '/dashboard/admissions', badge: newAdmissionsCount > 0 ? newAdmissionsCount.toString() : null },
         { title: 'Pupil Management', icon: Users, href: '/dashboard/students' },
         { title: 'Parent Portal', icon: Heart, href: '/dashboard/parent-portal', visible: isAdmin },
         { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr', visible: isAdmin },
@@ -181,7 +194,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       label: 'COMMUNICATION',
       color: 'text-rose-400',
       items: [
-        { title: 'Messages', icon: MessageSquare, href: '/dashboard/communication', badge: '3' },
+        { title: 'Messages', icon: MessageSquare, href: '/dashboard/communication', badge: announcementsCount > 0 ? announcementsCount.toString() : null },
         { title: 'Documents', icon: FileText, href: '/dashboard/documents' },
       ]
     }
