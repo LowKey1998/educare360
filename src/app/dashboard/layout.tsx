@@ -53,11 +53,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Protected Routes Check
   useEffect(() => {
     if (!profile && !loading) {
       router.push('/');
+      return;
     }
-  }, [profile, loading, router]);
+
+    if (profile) {
+      const adminOnlyPaths = ['/dashboard/users', '/dashboard/multi-school', '/dashboard/hr', '/dashboard/settings', '/dashboard/inventory'];
+      const isTryingAdminPath = adminOnlyPaths.some(path => pathname.startsWith(path));
+      
+      if (profile.role === 'parent' && isTryingAdminPath) {
+        router.push('/dashboard');
+      }
+    }
+  }, [profile, loading, router, pathname]);
 
   const handleSignOut = async () => {
     try {

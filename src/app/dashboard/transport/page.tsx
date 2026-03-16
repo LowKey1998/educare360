@@ -14,14 +14,13 @@ import {
   Loader2,
   Trash2,
   Database,
-  ArrowUpRight,
   ShieldCheck,
   Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
@@ -40,8 +39,11 @@ export default function TransportManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const database = useDatabase();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
   const { data: routes, loading } = useRTDBCollection(database, 'transport_routes');
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
 
   const stats = useMemo(() => {
     const active = routes.filter((r: any) => r.status === 'Active').length;
@@ -51,7 +53,7 @@ export default function TransportManagementPage() {
       active,
       pupils: totalPupils,
       capacityPct: capacity > 0 ? ((totalPupils / capacity) * 100).toFixed(1) : '0.0',
-      revenue: (totalPupils * 45).toLocaleString() // Estimated $45/pupil
+      revenue: (totalPupils * 45).toLocaleString() 
     };
   }, [routes]);
 
@@ -63,6 +65,7 @@ export default function TransportManagementPage() {
   }, [routes, search]);
 
   const handleAddRoute = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (!isAdmin) return;
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
@@ -88,7 +91,7 @@ export default function TransportManagementPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this bus route? This will unassign all students.')) return;
+    if (!isAdmin || !confirm('Remove this bus route?')) return;
     try {
       await remove(ref(database, `transport_routes/${id}`));
       toast({ title: "Route Removed", description: "The bus route was deleted." });
@@ -104,7 +107,7 @@ export default function TransportManagementPage() {
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <svg viewBox="0 0 400 200" className="w-full h-full">
             <circle cx="350" cy="30" r="80" fill="white" />
-            <circle cx="50" cy="180" r="100" fill="white" />
+            <circle cx="100" cy="180" r="120" fill="white" />
           </svg>
         </div>
         <div className="relative z-10 flex items-center gap-4">
@@ -112,8 +115,8 @@ export default function TransportManagementPage() {
             <Bus className="w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Fleet & Transport Management</h2>
-            <p className="text-sm text-white/80 mt-1">Manage institutional logistics, bus routes, and pupil allocations</p>
+            <h2 className="text-xl font-bold">{isAdmin ? 'Fleet & Transport Management' : 'School Bus Routes'}</h2>
+            <p className="text-sm text-white/80 mt-1">Institutional logistics and student route assignments</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden md:flex px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
@@ -123,19 +126,20 @@ export default function TransportManagementPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <TransportMetricCard icon={<Navigation className="h-4.5 w-4.5 text-indigo-600" />} label="Active Routes" value={loading ? '...' : stats.active.toString()} color="bg-indigo-50" trend="Live Sync" />
-        <TransportMetricCard icon={<Users className="h-4.5 w-4.5 text-blue-600" />} label="Total Pupils" value={loading ? '...' : stats.pupils.toString()} color="bg-blue-50" trend={`${stats.capacityPct}% Capacity`} />
-        <TransportMetricCard icon={<Zap className="h-4.5 w-4.5 text-amber-600" />} label="Bus Fleet" value={loading ? '...' : routes.length.toString()} color="bg-amber-50" trend="All Active" />
-        <TransportMetricCard icon={<DollarSign className="h-4.5 w-4.5 text-emerald-600" />} label="Est. Revenue" value={`$${stats.revenue}`} color="bg-emerald-50" trend="+5.2% MoM" />
-      </div>
+      {isAdmin && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <TransportMetricCard icon={<Navigation className="h-4.5 w-4.5 text-indigo-600" />} label="Active Routes" value={loading ? '...' : stats.active.toString()} color="bg-indigo-50" trend="Live Sync" />
+          <TransportMetricCard icon={<Users className="h-4.5 w-4.5 text-blue-600" />} label="Total Pupils" value={loading ? '...' : stats.pupils.toString()} color="bg-blue-50" trend={`${stats.capacityPct}% Capacity`} />
+          <TransportMetricCard icon={<Zap className="h-4.5 w-4.5 text-amber-600" />} label="Bus Fleet" value={loading ? '...' : routes.length.toString()} color="bg-amber-50" trend="All Active" />
+          <TransportMetricCard icon={<DollarSign className="h-4.5 w-4.5 text-emerald-600" />} label="Est. Revenue" value={`$${stats.revenue}`} color="bg-emerald-50" trend="+5.2% MoM" />
+        </div>
+      )}
 
       <Card className="border-gray-100 shadow-sm overflow-hidden">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-50 pb-4">
           <div>
             <CardTitle className="text-sm font-bold text-gray-800">Route Directory</CardTitle>
-            <CardDescription className="text-xs">Real-time status of institutional logistics</CardDescription>
+            <CardDescription className="text-xs">Real-time status of school transport</CardDescription>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:min-w-[200px]">
@@ -147,46 +151,48 @@ export default function TransportManagementPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Add Route
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <form onSubmit={handleAddRoute}>
-                  <DialogHeader>
-                    <DialogTitle>Register New Route</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Route Name</Label>
-                      <Input name="name" placeholder="e.g. Route 1 — Northern Suburbs" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Area Coverage</Label>
-                      <Input name="area" placeholder="e.g. Borrowdale, Mt Pleasant" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+            {isAdmin && (
+              <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                <DialogTrigger asChild>
+                  <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm whitespace-nowrap">
+                    <Plus className="h-3.5 w-3.5" /> Add Route
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <form onSubmit={handleAddRoute}>
+                    <DialogHeader>
+                      <DialogTitle>Register New Route</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
                       <div className="space-y-2">
-                        <Label>No. of Stops</Label>
-                        <Input name="stops" type="number" placeholder="12" required />
+                        <Label>Route Name</Label>
+                        <Input name="name" placeholder="e.g. Route 1 — Northern Suburbs" required />
                       </div>
                       <div className="space-y-2">
-                        <Label>Bus Capacity</Label>
-                        <Input name="capacity" type="number" placeholder="35" required />
+                        <Label>Area Coverage</Label>
+                        <Input name="area" placeholder="e.g. Borrowdale, Mt Pleasant" required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>No. of Stops</Label>
+                          <Input name="stops" type="number" placeholder="12" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Bus Capacity</Label>
+                          <Input name="capacity" type="number" placeholder="35" required />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isSubmitting} className="w-full">
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      Confirm Route
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting} className="w-full">
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Confirm Route
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -199,14 +205,16 @@ export default function TransportManagementPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-0 divide-x divide-y divide-gray-50">
               {filteredRoutes.map((route: any) => (
                 <div key={route.id} className="p-5 hover:bg-gray-50/50 transition-all group relative">
-                  <button 
-                    onClick={() => handleDelete(route.id)} 
-                    className="absolute top-4 right-4 p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => handleDelete(route.id)} 
+                      className="absolute top-4 right-4 p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white shadow-md">
                       <Bus className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
