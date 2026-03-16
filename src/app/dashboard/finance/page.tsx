@@ -14,7 +14,10 @@ import {
   ArrowDownRight,
   Search,
   Wallet,
-  Activity
+  Activity,
+  Settings2,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { 
   PieChart,
@@ -26,7 +29,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { 
   Dialog, 
   DialogContent, 
@@ -44,32 +47,42 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/services/finance';
 import { Student, Transaction } from '@/lib/types';
 
 const COLORS = ['#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
+const GRADES = ['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
 export default function FinanceBillingPage() {
   const database = useDatabase();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
   
   const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
   const { data: transactions, loading: txLoading } = useRTDBCollection<Transaction>(database, 'transactions');
   
   const [isPayOpen, setIsPayOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
 
+  // Fee Config States
+  const [feeAmount, setFeeAmount] = useState('');
+  const [feeTerm, setFeeTerm] = useState('Term 1');
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const loading = studentsLoading || txLoading;
 
   const stats = useMemo(() => {
     if (loading || !students || !transactions) return null;
 
     const totalPaid = transactions.reduce((acc, tx) => acc + (tx.amount || 0), 0);
-    const totalArrears = students.reduce((acc, s) => acc + (s.feeBalance || 0), 0);
+    const totalArrears = students.reduce((acc, s) => acc + (parseFloat(s.feeBalance as any) || 0), 0);
     const totalBilled = totalPaid + totalArrears;
-    const debtorCount = students.filter(s => (s.feeBalance || 0) > 0).length;
+    const debtorCount = students.filter(s => (parseFloat(s.feeBalance as any) || 0) > 0).length;
     const collectionRate = totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 0;
 
     const now = Date.now();
@@ -137,6 +150,40 @@ export default function FinanceBillingPage() {
     }
   };
 
+  const handleApplyFees = async () => {
+    if (!feeAmount || !feeTerm || selectedGrades.length === 0) {
+      toast({ title: "Validation Error", description: "Please fill all fields and select at least one grade.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const count = await financeService.applyTermFees(
+        database, 
+        parseFloat(feeAmount), 
+        feeTerm, 
+        selectedGrades
+      );
+      setIsConfigOpen(false);
+      setFeeAmount('');
+      setSelectedGrades([]);
+      toast({ 
+        title: "Fees Applied", 
+        description: `Successfully billed ${count} students for ${feeTerm}.` 
+      });
+    } catch (e) {
+      toast({ title: "Action Failed", description: "Failed to apply bulk fees.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleGrade = (grade: string) => {
+    setSelectedGrades(prev => 
+      prev.includes(grade) ? prev.filter(g => g !== grade) : [...prev, grade]
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
@@ -199,64 +246,150 @@ export default function FinanceBillingPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border-gray-100 shadow-sm overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-50 mb-4">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 border-b border-gray-50 mb-4">
             <div>
               <CardTitle className="text-sm font-bold text-gray-800">Student Ledger & Payments</CardTitle>
               <CardDescription className="text-xs">Search pupils and record manual fee payments</CardDescription>
             </div>
-            <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
-              <DialogTrigger asChild>
-                <button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 flex items-center gap-1.5 h-8 text-xs font-bold transition-all shadow-sm">
-                  <Plus className="h-3.5 w-3.5" /> Record Payment
-                </button>
-              </DialogTrigger>
-              <DialogContent>
-                <form onSubmit={handlePayment}>
-                  <DialogHeader>
-                    <DialogTitle>Process Fee Payment</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Select Student</Label>
-                      <Select name="studentId" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Search student..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {students.map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade}) — Bal: ${s.feeBalance}</SelectItem>
+            <div className="flex gap-2">
+              {isAdmin && (
+                <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+                  <DialogTrigger asChild>
+                    <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-1.5 h-8 text-xs font-bold transition-all shadow-sm">
+                      <Settings2 className="h-3.5 w-3.5 text-teal-600" /> Fee Setup
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Termly Fee Configuration</DialogTitle>
+                      <CardDescription>Define fees for the term and apply them to specific grades.</CardDescription>
+                    </DialogHeader>
+                    <div className="space-y-5 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Term</Label>
+                          <Select value={feeTerm} onValueChange={setFeeTerm}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Term 1">Term 1</SelectItem>
+                              <SelectItem value="Term 2">Term 2</SelectItem>
+                              <SelectItem value="Term 3">Term 3</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee Amount ($)</Label>
+                          <Input 
+                            type="number" 
+                            placeholder="0.00" 
+                            value={feeAmount} 
+                            onChange={(e) => setFeeAmount(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Apply to Grades</Label>
+                          <button 
+                            onClick={() => setSelectedGrades(selectedGrades.length === GRADES.length ? [] : [...GRADES])}
+                            className="text-[9px] font-bold text-teal-600 hover:underline uppercase"
+                          >
+                            {selectedGrades.length === GRADES.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-1 custom-scrollbar">
+                          {GRADES.map(grade => (
+                            <div 
+                              key={grade} 
+                              className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                              onClick={() => toggleGrade(grade)}
+                            >
+                              <Checkbox checked={selectedGrades.includes(grade)} onCheckedChange={() => toggleGrade(grade)} />
+                              <span className="text-[11px] font-medium text-gray-700">{grade}</span>
+                            </div>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      </div>
+
+                      {selectedGrades.length > 0 && feeAmount && (
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex gap-3">
+                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-amber-800 leading-relaxed">
+                            This will add <span className="font-bold">${feeAmount}</span> to the balance of every student in the <span className="font-bold">{selectedGrades.length}</span> selected grades. This action is irreversible.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <Label>Amount to Pay ($)</Label>
-                      <Input name="amount" type="number" step="0.01" placeholder="0.00" required />
+                    <DialogFooter>
+                      <Button 
+                        disabled={isSubmitting || selectedGrades.length === 0 || !feeAmount} 
+                        onClick={handleApplyFees}
+                        className="w-full bg-teal-600 hover:bg-teal-700 font-bold"
+                      >
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                        Apply Bulk Fees
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
+                <DialogTrigger asChild>
+                  <button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 flex items-center gap-1.5 h-8 text-xs font-bold transition-all shadow-sm">
+                    <Plus className="h-3.5 w-3.5" /> Record Payment
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <form onSubmit={handlePayment}>
+                    <DialogHeader>
+                      <DialogTitle>Process Fee Payment</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Select Student</Label>
+                        <Select name="studentId" required>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Search student..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {students.map(s => (
+                              <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade}) — Bal: ${s.feeBalance}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount to Pay ($)</Label>
+                        <Input name="amount" type="number" step="0.01" placeholder="0.00" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Payment Method</Label>
+                        <Select name="method" defaultValue="Bank Transfer">
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="POS/Card">Card (POS)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Payment Method</Label>
-                      <Select name="method" defaultValue="Bank Transfer">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                          <SelectItem value="Mobile Money">Mobile Money</SelectItem>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="POS/Card">Card (POS)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600">
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      Post Payment
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600">
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Post Payment
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="px-4 py-3">
@@ -288,10 +421,15 @@ export default function FinanceBillingPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {students.filter(s => s.studentName?.toLowerCase().includes(search.toLowerCase())).map((student) => {
-                      const balance = student.feeBalance || 0;
+                      const balance = parseFloat(student.feeBalance as any) || 0;
                       return (
                         <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-4 py-3 font-bold text-gray-800">{student.studentName}</td>
+                          <td className="px-4 py-3 font-bold text-gray-800">
+                            {student.studentName}
+                            <div className="text-[9px] text-gray-400 font-medium">
+                              {student.lastBillingTerm ? `Last billed: ${student.lastBillingTerm}` : 'No term history'}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-gray-500 font-medium">{student.grade}</td>
                           <td className={`px-4 py-3 text-right font-bold ${balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                             ${balance.toFixed(2)}
