@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, push, remove, serverTimestamp } from 'firebase/database';
+import { ref, remove } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 
 const TEMPLATES_DATA = [
@@ -74,7 +74,6 @@ export default function DocumentBuilderPage() {
   const database = useDatabase();
   const { toast } = useToast();
   
-  // Real-time templates from database (if any exist)
   const { data: dbTemplates, loading } = useRTDBCollection(database, 'document_templates');
 
   const allTemplates = useMemo(() => {
@@ -110,7 +109,6 @@ export default function DocumentBuilderPage() {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -128,7 +126,6 @@ export default function DocumentBuilderPage() {
         </div>
       </div>
 
-      {/* Stats Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <DocStatCard label="Templates Created" value="24" trend="+3" isPositive={true} icon={<PanelsTopLeft className="w-4.5 h-4.5 text-blue-600" />} color="bg-blue-50" />
         <DocStatCard label="Generated This Term" value="1,847" trend="+156" isPositive={true} icon={<FileText className="w-4.5 h-4.5 text-green-600" />} color="bg-green-50" />
@@ -136,7 +133,6 @@ export default function DocumentBuilderPage() {
         <DocStatCard label="Bulk Jobs Complete" value="98%" trend="+2%" isPositive={true} icon={<CircleCheckBig className="w-4.5 h-4.5 text-purple-600" />} color="bg-purple-50" />
       </div>
 
-      {/* Main Content Area */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         <Tabs defaultValue="report-cards" className="w-full" onValueChange={setActiveType}>
           <div className="flex border-b border-gray-100 px-2 overflow-x-auto custom-scrollbar">
@@ -162,51 +158,51 @@ export default function DocumentBuilderPage() {
             </TabsList>
           </div>
 
-          <div className="p-5">
-            <div className="space-y-4">
-              {/* Filters & Actions */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                  <Input 
-                    placeholder="Search templates..." 
-                    className="pl-9 text-xs h-9 border-gray-200" 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+          <TabsContent value={activeType} className="m-0">
+            <div className="p-5">
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                    <Input 
+                      placeholder="Search templates..." 
+                      className="pl-9 text-xs h-9 border-gray-200" 
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="h-9 gap-1.5 text-gray-600">
+                      <Users className="h-3.5 w-3.5" /> Bulk Generate
+                    </Button>
+                    <Button className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium" onClick={() => toast({ title: "Document Studio", description: "Initializing template designer..." })}>
+                      <Plus className="h-3.5 w-3.5" /> New Template
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-9 gap-1.5 text-gray-600">
-                    <Users className="h-3.5 w-3.5" /> Bulk Generate
-                  </Button>
-                  <Button className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium" onClick={() => toast({ title: "Document Studio", description: "Initializing template designer..." })}>
-                    <Plus className="h-3.5 w-3.5" /> New Template
-                  </Button>
-                </div>
-              </div>
 
-              {/* Template Grid */}
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-2" />
-                  <p className="text-xs text-gray-400 italic">Syncing template library...</p>
-                </div>
-              ) : filteredTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {filteredTemplates.map((template) => (
-                    <TemplateCard key={template.id} template={template} onDelete={() => handleDelete(template.id)} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-20 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                  <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                  <p className="text-sm text-gray-400 font-medium">No templates found in this category.</p>
-                  <p className="text-xs text-gray-300 mt-1">Start by creating a new template or changing filters.</p>
-                </div>
-              )}
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-2" />
+                    <p className="text-xs text-gray-400 italic">Syncing template library...</p>
+                  </div>
+                ) : filteredTemplates.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filteredTemplates.map((template) => (
+                      <TemplateCard key={template.id} template={template} onDelete={() => handleDelete(template.id)} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                    <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                    <p className="text-sm text-gray-400 font-medium">No templates found in this category.</p>
+                    <p className="text-xs text-gray-300 mt-1">Start by creating a new template or changing filters.</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </TabsContent>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
@@ -238,7 +234,6 @@ function TemplateCard({ template, onDelete }: any) {
   return (
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 h-44 relative overflow-hidden shrink-0">
-        {/* Mock Document Preview */}
         <div className="bg-white rounded-lg shadow-sm p-3 h-full overflow-hidden border border-gray-200 scale-95 origin-top transition-transform group-hover:scale-100">
           <div className="flex items-center gap-1.5 mb-2">
             <div className="w-4 h-4 rounded flex items-center justify-center bg-amber-100">
@@ -297,7 +292,7 @@ function TemplateCard({ template, onDelete }: any) {
         <button className="px-2 py-1 rounded-lg text-[10px] font-bold hover:bg-white text-gray-500 uppercase tracking-tighter transition-colors">
           {template.status === 'Active' ? 'Deactivate' : 'Activate'}
         </button>
-        <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button onClick={() => onDelete(template.id)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
     </div>
   );
