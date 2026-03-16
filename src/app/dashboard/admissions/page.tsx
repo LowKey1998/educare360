@@ -16,7 +16,7 @@ import {
   Mail,
   Clock
 } from 'lucide-react';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { 
   Dialog, 
   DialogContent, 
@@ -54,8 +54,11 @@ export default function AdmissionsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const database = useDatabase();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
   const { data: applications, loading } = useRTDBCollection<Admission>(database, 'admissions');
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
 
   const filteredApps = useMemo(() => {
     if (!applications) return [];
@@ -81,6 +84,7 @@ export default function AdmissionsPage() {
   }, [filteredApps]);
 
   const handleAddApp = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (!isAdmin) return;
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
@@ -106,6 +110,7 @@ export default function AdmissionsPage() {
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
+    if (!isAdmin) return;
     try {
       await admissionService.updateStatus(database, id, newStatus);
       toast({ title: "Status Updated", description: `Application is now ${newStatus}.` });
@@ -115,7 +120,7 @@ export default function AdmissionsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this application?')) return;
+    if (!isAdmin || !confirm('Remove this application?')) return;
     try {
       await admissionService.deleteApplication(database, id);
       toast({ title: "Application Removed", description: "The record was deleted." });
@@ -160,50 +165,52 @@ export default function AdmissionsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700 h-9 text-xs font-bold gap-1.5 shadow-sm">
-              <Plus className="h-3.5 w-3.5" /> New Application
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={handleAddApp}>
-              <DialogHeader><DialogTitle>Register New Application</DialogTitle></DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Student Full Name</Label>
-                  <Input name="name" placeholder="Full name" required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+        {isAdmin && (
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 h-9 text-xs font-bold gap-1.5 shadow-sm">
+                <Plus className="h-3.5 w-3.5" /> New Application
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={handleAddApp}>
+                <DialogHeader><DialogTitle>Register New Application</DialogTitle></DialogHeader>
+                <div className="grid gap-4 py-4">
                   <div className="space-y-2">
-                    <Label>Grade Applied For</Label>
-                    <Select name="grade" defaultValue="Grade 1">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
-                          <SelectItem key={g} value={g}>{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Student Full Name</Label>
+                    <Input name="name" placeholder="Full name" required />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Age</Label>
-                    <Input name="age" type="number" placeholder="6" required />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Grade Applied For</Label>
+                      <Select name="grade" defaultValue="Grade 1">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
+                            <SelectItem key={g} value={g}>{g}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Age</Label>
+                      <Input name="age" type="number" placeholder="6" required />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" name="docs" id="docs" className="rounded border-gray-300" />
+                    <Label htmlFor="docs" className="text-xs">Documentation Pending</Label>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" name="docs" id="docs" className="rounded border-gray-300" />
-                  <Label htmlFor="docs" className="text-xs">Documentation Pending</Label>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={isSubmitting} className="bg-blue-600">
-                  {isSubmitting ? "Processing..." : "Submit Application"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting} className="bg-blue-600">
+                    {isSubmitting ? "Processing..." : "Submit Application"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar">
@@ -224,19 +231,21 @@ export default function AdmissionsPage() {
                 <div key={app.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm hover:shadow-md transition-all group relative">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-mono text-gray-400">{app.applicationId}</p>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Select onValueChange={(val) => updateStatus(app.id, val)}>
-                        <SelectTrigger className="h-6 w-6 p-0 border-none bg-transparent">
-                          <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_LABELS.map(s => (
-                            <SelectItem key={s} value={s} className="text-[10px]">{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <button onClick={() => handleDelete(app.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Select onValueChange={(val) => updateStatus(app.id, val)}>
+                          <SelectTrigger className="h-6 w-6 p-0 border-none bg-transparent">
+                            <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_LABELS.map(s => (
+                              <SelectItem key={s} value={s} className="text-[10px]">{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <button onClick={() => handleDelete(app.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs font-bold text-gray-800 mb-1">{app.studentName}</p>
                   <p className="text-[10px] text-gray-500 font-medium">{app.grade} • Age {app.age}</p>

@@ -79,9 +79,9 @@ export default function DashboardPage() {
   }, [students, admissions, users, announcements, transactions]);
 
   const parentStats = useMemo(() => {
-    const totalArrears = myChildren.reduce((acc, s) => acc + (parseFloat(s.feeBalance) || 0), 0);
+    const totalArrears = myChildren.reduce((acc, s) => acc + (parseFloat(s.feeBalance as any) || 0), 0);
     const avgAttendance = myChildren.length > 0 
-      ? myChildren.reduce((acc, s) => acc + (parseFloat(s.attendanceRate) || 0), 0) / myChildren.length 
+      ? myChildren.reduce((acc, s) => acc + (parseFloat(s.attendanceRate as any) || 0), 0) / myChildren.length 
       : 0;
     return {
       childCount: myChildren.length,
