@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from 'react';
@@ -19,14 +18,6 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { 
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  Tooltip,
-  ResponsiveContainer
-} from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useDatabase, useRTDBCollection, useUserProfile, useRTDBDoc } from '@/firebase';
@@ -79,7 +70,7 @@ export default function FinanceBillingPage() {
   const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const stats = useMemo(() => {
-    if (loading || !students || !transactions) return null;
+    if (loading || !students || !transactions) return { arrears: '0', debtors: 0, totalBilled: '0', collectionRate: '0.0', unpaidPct: '0.0' };
 
     const totalPaid = transactions.reduce((acc, tx) => acc + (tx.amount || 0), 0);
     const totalArrears = students.reduce((acc, s) => acc + (parseFloat(s.feeBalance as any) || 0), 0);

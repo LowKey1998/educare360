@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from 'react';
@@ -79,7 +78,7 @@ export default function AcademicManagementPage() {
   }, [students, activeGrade]);
 
   const stats = useMemo(() => {
-    if (filteredStudents.length === 0) return { avg: '0%', top: 'N/A', passRate: '0%' };
+    if (filteredStudents.length === 0) return { avg: '0%', top: 'N/A', passRate: '0%', topScore: 'N/A' };
     
     let totalScore = 0;
     let count = 0;
@@ -161,8 +160,8 @@ export default function AcademicManagementPage() {
             <p className="text-sm text-white/80 mt-1">Curriculum, marks entry, and academic performance tracking</p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-2">
-            <div className="px-3 py-1.5 bg-white/15 rounded-lg text-xs font-medium flex items-center gap-1.5 backdrop-blur-md">
-              <Database className="w-3 h-3" /> RTDB Active
+            <div className="px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 backdrop-blur-md">
+              <Database className="w-3 h-3" /> Registry Active
             </div>
           </div>
         </div>
@@ -174,7 +173,7 @@ export default function AcademicManagementPage() {
             <SelectValue placeholder="Select Grade" />
           </SelectTrigger>
           <SelectContent>
-            {['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(grade => (
+            {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(grade => (
               <SelectItem key={grade} value={grade}>{grade}</SelectItem>
             ))}
           </SelectContent>
