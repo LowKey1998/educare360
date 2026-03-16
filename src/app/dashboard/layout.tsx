@@ -87,6 +87,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return announcements.length;
   }, [announcements]);
 
+  // Apply dynamic primary color
+  const primaryColor = schoolSettings?.primaryColor || '#0D9488';
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1A2E] flex items-center justify-center">
@@ -216,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const logoUrl = schoolSettings?.logoUrl;
 
   return (
-    <div className="flex h-screen bg-[#F8F9FC] overflow-hidden">
+    <div className="flex h-screen bg-[#F8F9FC] overflow-hidden" style={{ '--primary': primaryColor } as React.CSSProperties}>
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -224,7 +227,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-0 z-50 h-full w-64 bg-[#0F1A2E] flex flex-col border-r border-[#1E3A5F]/50 transition-transform duration-300 md:relative md:translate-x-0`}>
         <div className="p-4 border-b border-[#1E3A5F]/50">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <div 
+              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+              style={{ backgroundColor: primaryColor }}
+            >
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
               ) : (
@@ -239,7 +245,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="mt-3 relative">
             <div className="w-full flex items-center gap-2 px-2.5 py-2 bg-[#1A2742] rounded-lg border border-[#1E3A5F]/50">
-              <div className={`w-5 h-5 rounded flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0 ${isParent ? 'bg-rose-600' : 'bg-teal-600'}`}>
+              <div 
+                className="w-5 h-5 rounded flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
+                style={{ backgroundColor: isParent ? '#E11D48' : primaryColor }}
+              >
                 {profile.role?.substring(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0 text-left">
@@ -279,11 +288,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         href={item.href}
                         className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all duration-200 group ${
                           isActive 
-                            ? 'bg-gradient-to-r from-teal-500/20 to-transparent text-teal-400 border-l-2 border-teal-400' 
+                            ? 'bg-gradient-to-r from-teal-500/20 to-transparent border-l-2' 
                             : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                         }`}
+                        style={{ 
+                          color: isActive ? primaryColor : undefined,
+                          borderColor: isActive ? primaryColor : undefined,
+                          background: isActive ? `${primaryColor}10` : undefined
+                        }}
                       >
-                        <item.icon className={`h-4.5 w-4.5 ${isActive ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-400'}`} />
+                        <item.icon className="h-4.5 w-4.5" style={{ color: isActive ? primaryColor : 'inherit' }} />
                         <span className="truncate flex-1 text-left">{item.title}</span>
                         {item.badge && (
                           <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded-full text-[10px] font-medium">
@@ -337,11 +351,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-[11px] font-bold text-gray-800 leading-none">{profile.displayName || profile.email?.split('@')[0]}</p>
                 <p className="text-[9px] text-gray-400 mt-0.5 capitalize">{profile.role}</p>
               </div>
-              <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center">
+              <div 
+                className="h-8 w-8 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center"
+                style={{ backgroundColor: primaryColor + '10' }}
+              >
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
-                  <UserCircle className="h-6 w-6 text-gray-200" />
+                  <UserCircle className="h-6 w-6" style={{ color: primaryColor }} />
                 )}
               </div>
             </div>

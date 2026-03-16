@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   Upload,
   Link as LinkIcon,
-  Image as ImageIcon
+  ImageIcon,
+  Palette
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDatabase, useRTDBDoc } from '@/firebase';
 import { ref, set, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
+
+const PRESET_COLORS = [
+  { name: 'Teal (Default)', value: '#0D9488' },
+  { name: 'Ocean Blue', value: '#1E40AF' },
+  { name: 'Indigo', value: '#4F46E5' },
+  { name: 'Crimson', value: '#991B1B' },
+  { name: 'Emerald', value: '#065F46' },
+  { name: 'Purple', value: '#6D28D9' },
+  { name: 'Amber', value: '#B45309' },
+  { name: 'Slate', value: '#1E293B' },
+];
 
 export default function SystemSettingsPage() {
   const database = useDatabase();
@@ -42,7 +53,8 @@ export default function SystemSettingsPage() {
     email: '',
     phone: '',
     address: '',
-    logoUrl: ''
+    logoUrl: '',
+    primaryColor: '#0D9488'
   });
 
   useEffect(() => {
@@ -55,7 +67,8 @@ export default function SystemSettingsPage() {
         email: schoolSettings.email || '',
         phone: schoolSettings.phone || '',
         address: schoolSettings.address || '',
-        logoUrl: schoolSettings.logoUrl || ''
+        logoUrl: schoolSettings.logoUrl || '',
+        primaryColor: schoolSettings.primaryColor || '#0D9488'
       });
     }
   }, [schoolSettings]);
@@ -100,12 +113,12 @@ export default function SystemSettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-            <Settings className="h-6 w-6 text-teal-600" />
+            <Settings className="h-6 w-6 text-teal-600" style={{ color: formData.primaryColor }} />
             System Administration
           </h1>
           <p className="text-sm text-gray-500">Configure global institutional settings and platform behavior.</p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving} className="bg-teal-600 hover:bg-teal-700 gap-2">
+        <Button onClick={handleSave} disabled={isSaving} className="gap-2" style={{ backgroundColor: formData.primaryColor }}>
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save Changes
         </Button>
@@ -114,7 +127,7 @@ export default function SystemSettingsPage() {
       <Tabs defaultValue="institution" className="w-full">
         <TabsList className="bg-white border border-gray-100 p-1 rounded-xl shadow-sm h-auto gap-1 mb-6">
           <TabsTrigger value="institution" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Institution Profile</TabsTrigger>
-          <TabsTrigger value="branding" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Branding</TabsTrigger>
+          <TabsTrigger value="branding" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Branding & Color</TabsTrigger>
           <TabsTrigger value="academic" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Academic Sessions</TabsTrigger>
           <TabsTrigger value="notifications" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Notifications</TabsTrigger>
         </TabsList>
@@ -178,7 +191,10 @@ export default function SystemSettingsPage() {
                 <CardTitle className="text-sm">Identity Preview</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center text-center p-6 space-y-4">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white overflow-hidden">
+                <div 
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg text-white overflow-hidden"
+                  style={{ backgroundColor: formData.primaryColor }}
+                >
                   {formData.logoUrl ? (
                     <img src={formData.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
                   ) : (
@@ -201,22 +217,44 @@ export default function SystemSettingsPage() {
         <TabsContent value="branding" className="space-y-6">
           <Card className="border-gray-100 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-sm">Institutional Branding</CardTitle>
-              <CardDescription className="text-xs">Manage your school logo and visual identity.</CardDescription>
+              <CardTitle className="text-sm">Institutional Visual Identity</CardTitle>
+              <CardDescription className="text-xs">Select your brand color and upload your school logo.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2">
-                      <LinkIcon className="h-3 w-3" /> LOGO IMAGE URL
+                <div className="space-y-6">
+                  {/* Color Selector */}
+                  <div className="space-y-3">
+                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                      <Palette className="h-3 w-3" /> Brand Primary Color
                     </Label>
-                    <Input 
-                      placeholder="https://example.com/logo.png" 
-                      value={formData.logoUrl}
-                      onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
-                    />
-                    <p className="text-[10px] text-gray-400">Provide a direct link to an image (PNG, JPG, SVG).</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {PRESET_COLORS.map((color) => (
+                        <button
+                          key={color.value}
+                          onClick={() => setFormData(prev => ({ ...prev, primaryColor: color.value }))}
+                          className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
+                            formData.primaryColor === color.value ? 'border-gray-800 scale-105 shadow-sm' : 'border-transparent'
+                          }`}
+                          style={{ backgroundColor: color.value }}
+                          title={color.name}
+                        >
+                          {formData.primaryColor === color.value && <CheckCircle2 className="h-4 w-4 text-white" />}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="flex-1">
+                        <Label className="text-[10px] text-gray-400">Custom Hex Code</Label>
+                        <Input 
+                          value={formData.primaryColor}
+                          onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                          className="h-9 text-xs font-mono"
+                          placeholder="#000000"
+                        />
+                      </div>
+                      <div className="w-9 h-9 rounded-lg border border-gray-200 mt-5" style={{ backgroundColor: formData.primaryColor }} />
+                    </div>
                   </div>
 
                   <div className="relative">
@@ -224,43 +262,60 @@ export default function SystemSettingsPage() {
                       <span className="w-full border-t border-gray-100"></span>
                     </div>
                     <div className="relative flex justify-center text-[10px] uppercase font-bold">
-                      <span className="bg-white px-2 text-gray-300">OR UPLOAD</span>
+                      <span className="bg-white px-2 text-gray-300">Identity Resources</span>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2">
-                      <Upload className="h-3 w-3" /> UPLOAD LOGO FILE
+                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                      <LinkIcon className="h-3 w-3" /> Logo Image URL
                     </Label>
-                    <div className="flex items-center gap-3">
-                      <Input 
-                        type="file" 
-                        accept="image/*" 
-                        className="text-xs" 
-                        onChange={handleLogoUpload}
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-400">Upload a local file. Recommended size: 512x512px.</p>
+                    <Input 
+                      placeholder="https://example.com/logo.png" 
+                      value={formData.logoUrl}
+                      onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                      <Upload className="h-3 w-3" /> Upload Logo File
+                    </Label>
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      className="text-xs" 
+                      onChange={handleLogoUpload}
+                    />
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-center">
-                  {formData.logoUrl ? (
-                    <div className="space-y-4">
-                      <div className="w-32 h-32 rounded-2xl bg-white p-2 shadow-sm border border-gray-100 overflow-hidden mx-auto">
+                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-center space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Branding Preview</p>
+                    <div 
+                      className="w-32 h-32 rounded-3xl p-2 shadow-xl flex items-center justify-center overflow-hidden mx-auto transition-colors duration-500" 
+                      style={{ backgroundColor: formData.primaryColor }}
+                    >
+                      {formData.logoUrl ? (
                         <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setFormData(prev => ({...prev, logoUrl: ''}))} className="text-red-500 hover:text-red-600 border-red-100 hover:bg-red-50 text-[10px] h-7">
-                        Remove Logo
-                      </Button>
+                      ) : (
+                        <span className="text-4xl font-bold text-white">{formData.shortName?.[0] || 'E'}</span>
+                      )}
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mx-auto shadow-sm">
-                        <ImageIcon className="h-8 w-8 text-gray-200" />
-                      </div>
-                      <p className="text-xs font-medium text-gray-400">No Logo Provided</p>
+                  </div>
+                  
+                  <div className="w-full max-w-[200px] space-y-2">
+                    <div className="h-8 rounded-lg w-full" style={{ backgroundColor: formData.primaryColor + '20' }}>
+                      <div className="h-full rounded-lg w-1/3" style={{ backgroundColor: formData.primaryColor }} />
                     </div>
+                    <p className="text-[9px] text-gray-400 italic">Example component theming using your primary brand color.</p>
+                  </div>
+
+                  {formData.logoUrl && (
+                    <Button variant="outline" size="sm" onClick={() => setFormData(prev => ({...prev, logoUrl: ''}))} className="text-red-500 hover:text-red-600 border-red-100 hover:bg-red-50 text-[10px] h-7">
+                      Remove Logo
+                    </Button>
                   )}
                 </div>
               </div>
@@ -278,7 +333,7 @@ export default function SystemSettingsPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400">ACTIVE ACADEMIC YEAR</Label>
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Active Academic Year</Label>
                     <Input 
                       placeholder="2026" 
                       value={formData.currentYear}
@@ -286,7 +341,7 @@ export default function SystemSettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400">CURRENT TERM</Label>
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Current Term</Label>
                     <select 
                       className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                       value={formData.currentTerm}
@@ -298,11 +353,11 @@ export default function SystemSettingsPage() {
                     </select>
                   </div>
                 </div>
-                <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-teal-600 mt-0.5" />
+                <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
                   <div>
-                    <p className="text-xs font-bold text-teal-800">Operational Update</p>
-                    <p className="text-[10px] text-teal-700 mt-1 leading-relaxed">
+                    <p className="text-xs font-bold text-gray-800">Operational Update</p>
+                    <p className="text-[10px] text-gray-500 mt-1 leading-relaxed">
                       Changing these settings will update all dashboards, report card headers, and attendance registers across the entire institution instantly.
                     </p>
                   </div>
