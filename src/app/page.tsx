@@ -1,8 +1,8 @@
-
 'use client';
 
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useDatabase, useRTDBDoc } from '@/firebase';
+import { useUser, useDatabase, useRTDBDoc, useRTDBCollection } from '@/firebase';
 import { 
   ArrowRight, 
   BookOpen, 
@@ -17,7 +17,8 @@ import {
   Lock,
   Facebook,
   Twitter,
-  Instagram
+  Instagram,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -28,8 +29,28 @@ export default function LandingPage() {
   const router = useRouter();
   
   const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const { data: students, loading: studentsLoading } = useRTDBCollection(database, 'students');
+  const { data: users, loading: usersLoading } = useRTDBCollection(database, 'users');
+
   const schoolName = schoolSettings?.schoolName || 'EduCare360';
   const primaryColor = schoolSettings?.primaryColor || '#0D9488';
+
+  const stats = useMemo(() => {
+    const totalStudents = students?.length || 0;
+    const staffCount = users?.filter(u => u.role === 'admin' || u.role === 'staff').length || 0;
+    
+    // Calculate global avg attendance from student records
+    const avgAttendance = students?.length > 0 
+      ? (students.reduce((acc: number, s: any) => acc + (parseFloat(s.attendanceRate as any) || 0), 0) / students.length).toFixed(1)
+      : "98.5"; // Default if no data
+
+    return {
+      totalStudents: totalStudents > 0 ? `${totalStudents}+` : "1,200+",
+      staffCount: staffCount > 0 ? `${staffCount}+` : "85+",
+      avgAttendance: `${avgAttendance}%`,
+      globalRanking: "Top 10"
+    };
+  }, [students, users]);
 
   if (authLoading) {
     return (
@@ -105,7 +126,7 @@ export default function LandingPage() {
                   ))}
                 </div>
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-widest">
-                  Trusted by <span className="text-gray-900 font-bold">2,500+</span> Students & Parents
+                  Trusted by <span className="text-gray-900 font-bold">{studentsLoading ? '...' : stats.totalStudents}</span> Students & Parents
                 </p>
               </div>
             </div>
@@ -148,7 +169,6 @@ export default function LandingPage() {
               desc="Track your child's academic progress, attendance records, and pay school fees securely online."
               icon={<Heart className="h-6 w-6 text-rose-600" />}
               color="bg-rose-50"
-              href="/login"
               role="Parent Access"
             />
             <PortalCard 
@@ -156,7 +176,6 @@ export default function LandingPage() {
               desc="Manage lesson plans, classroom activities, and student assessments with integrated AI assistance."
               icon={<ShieldCheck className="h-6 w-6 text-teal-600" />}
               color="bg-teal-50"
-              href="/login"
               role="Teacher Login"
             />
             <PortalCard 
@@ -164,7 +183,6 @@ export default function LandingPage() {
               desc="Global oversight of finances, multi-school management, and platform configuration."
               icon={<Lock className="h-6 w-6 text-indigo-600" />}
               color="bg-indigo-50"
-              href="/login"
               role="System Admin"
             />
           </div>
@@ -175,10 +193,10 @@ export default function LandingPage() {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            <StatItem label="Active Students" value="1,200+" />
-            <StatItem label="Certified Staff" value="85+" />
-            <StatItem label="Accuracy Rate" value="99.9%" />
-            <StatItem label="Global Ranking" value="Top 10" />
+            <StatItem label="Active Students" value={studentsLoading ? '...' : stats.totalStudents} />
+            <StatItem label="Certified Staff" value={usersLoading ? '...' : stats.staffCount} />
+            <StatItem label="Attendance Rate" value={studentsLoading ? '...' : stats.avgAttendance} />
+            <StatItem label="Global Ranking" value={stats.globalRanking} />
           </div>
         </div>
       </section>
@@ -257,9 +275,9 @@ export default function LandingPage() {
   );
 }
 
-function PortalCard({ title, desc, icon, color, href, role }: any) {
+function PortalCard({ title, desc, icon, color, role }: any) {
   return (
-    <Link href={href} className="group">
+    <Link href="/login" className="group">
       <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 h-full flex flex-col">
         <div className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
           {icon}
