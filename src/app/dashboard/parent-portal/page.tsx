@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   ShieldCheck,
   MoreHorizontal,
-  UserCheck,
   Plus,
   Check,
   X
@@ -40,13 +39,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { studentService } from '@/services/students';
@@ -133,12 +125,11 @@ export default function ParentPortalPage() {
   const availableStudentsForLink = useMemo(() => {
     if (!isLinkOpen) return [];
     return students.filter(s => {
-      const isNotAlreadyLinked = s.parentEmail?.toLowerCase() !== linkingParentEmail.toLowerCase();
       const matchesSearch = s.studentName.toLowerCase().includes(studentSearch.toLowerCase()) || 
                            s.grade.toLowerCase().includes(studentSearch.toLowerCase());
-      return isNotAlreadyLinked && matchesSearch;
+      return matchesSearch;
     });
-  }, [students, isLinkOpen, linkingParentEmail, studentSearch]);
+  }, [students, isLinkOpen, studentSearch]);
 
   const handleUpdateEmail = async () => {
     if (!editingStudent || !newEmail) return;
@@ -291,20 +282,18 @@ export default function ParentPortalPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
-                  {family.accountExists && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setLinkingParentEmail(family.email);
-                        setSelectedStudentIds([]);
-                        setIsLinkOpen(true);
-                      }}
-                      className="h-8 text-[10px] font-bold gap-1 border-emerald-100 text-emerald-600 hover:bg-emerald-50"
-                    >
-                      <UserPlus className="h-3 w-3" /> Link Student
-                    </Button>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setLinkingParentEmail(family.email);
+                      setSelectedStudentIds([]);
+                      setIsLinkOpen(true);
+                    }}
+                    className="h-8 text-[10px] font-bold gap-1 border-emerald-100 text-emerald-600 hover:bg-emerald-50"
+                  >
+                    <UserPlus className="h-3 w-3" /> Link Student
+                  </Button>
                   {!family.accountExists && (
                     <Button 
                       variant="outline" 
@@ -315,7 +304,6 @@ export default function ParentPortalPage() {
                       <Mail className="h-3 w-3" /> Resend Invite
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-300"><MoreHorizontal className="h-4 w-4" /></Button>
                 </div>
               </div>
             )) : (
@@ -324,11 +312,11 @@ export default function ParentPortalPage() {
           </div>
         </div>
 
-        {/* Bulk Link Student Dialog */}
+        {/* Link Student Dialog */}
         <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Link Students to Account</DialogTitle>
+              <DialogTitle>Associate Students with Account</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
@@ -337,7 +325,7 @@ export default function ParentPortalPage() {
               </div>
               
               <div className="space-y-3">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Search & Select Pupils</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Search Registry</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                   <Input 
@@ -366,18 +354,11 @@ export default function ParentPortalPage() {
                     </div>
                   )) : (
                     <div className="p-8 text-center text-xs text-gray-400 italic">
-                      No matching students available for linking.
+                      No matching students available.
                     </div>
                   )}
                 </div>
               </div>
-
-              {selectedStudentIds.length > 0 && (
-                <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 rounded-lg text-emerald-700">
-                  <span className="text-[10px] font-bold uppercase">{selectedStudentIds.length} selected</span>
-                  <button onClick={() => setSelectedStudentIds([])} className="text-[10px] hover:underline font-bold">Clear</button>
-                </div>
-              )}
             </div>
             <DialogFooter>
               <Button 
@@ -386,7 +367,7 @@ export default function ParentPortalPage() {
                 className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold"
               >
                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
-                Associate {selectedStudentIds.length} Student{selectedStudentIds.length !== 1 ? 's' : ''}
+                Link {selectedStudentIds.length} Students
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -411,34 +392,16 @@ export default function ParentPortalPage() {
                   onChange={(e) => setNewEmail(e.target.value)} 
                   placeholder="parent@example.com"
                 />
-                <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                  Changing this email will update the contact details used for portal linking and automated notifications.
-                </p>
               </div>
             </div>
             <DialogFooter>
               <Button disabled={isUpdating} onClick={handleUpdateEmail} className="w-full bg-rose-600 hover:bg-rose-700 font-bold">
                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Synchronize Records
+                Update Registry Record
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    );
-  }
-
-  if (myChildren.length === 0) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 max-w-md mx-auto text-center">
-        <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 animate-bounce">
-          <Heart className="w-8 h-8 fill-current" />
-        </div>
-        <h2 className="text-lg font-bold text-gray-800">No Linked Family Profiles</h2>
-        <p className="text-xs text-gray-500 leading-relaxed">
-          We couldn't find any students associated with <strong>{profile?.email}</strong>. 
-          Please contact the school office to verify your email address in the institutional pupil registry.
-        </p>
       </div>
     );
   }
@@ -470,15 +433,10 @@ export default function ParentPortalPage() {
                 onClick={() => setSelectedChildId(child.id)}
                 className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition-all border ${
                   activeChild?.id === child.id 
-                    ? 'bg-white text-rose-600 border-white shadow-md scale-105' 
+                    ? 'bg-white text-rose-600 border-white shadow-md' 
                     : 'bg-white/10 text-white border-white/10 hover:bg-white/20'
                 }`}
               >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shadow-inner ${
-                  activeChild?.id === child.id ? 'bg-rose-50' : 'bg-white/20'
-                }`}>
-                  {child.studentName?.split(' ').map((n: string) => n[0]).join('')}
-                </div>
                 <div className="text-left">
                   <p className="text-[11px] font-bold truncate max-w-[120px]">{child.studentName}</p>
                   <p className={`text-[9px] font-bold uppercase ${activeChild?.id === child.id ? 'text-rose-400' : 'text-white/60'}`}>{child.grade}</p>
@@ -494,7 +452,7 @@ export default function ParentPortalPage() {
         <ParentMetricCard icon={<TrendingUp className="w-4 h-4 text-emerald-600" />} label="Attendance Rate" value={`${activeChild?.attendanceRate || 0}%`} color="bg-emerald-50" />
         <ParentMetricCard icon={<DollarSign className="w-4 h-4 text-amber-600" />} label="Fee Balance" value={`${currencySymbol}${activeChild?.feeBalance || 0}`} color="bg-amber-50" 
           valueColor={parseFloat(activeChild?.feeBalance as any) > 0 ? "text-rose-600" : "text-emerald-600"} />
-        <ParentMetricCard icon={<MessageSquare className="w-4 h-4 text-blue-600" />} label="Updates" value={msgsLoading ? '...' : announcements.length.toString()} color="bg-blue-50" />
+        <ParentMetricCard icon={<MessageSquare className="w-4 h-4 text-blue-600" />} label="Updates" value={announcements.length.toString()} color="bg-blue-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -503,7 +461,6 @@ export default function ParentPortalPage() {
             <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-tight">
               <GraduationCap className="w-4 h-4 text-rose-500" /> Academic Performance
             </h4>
-            <span className="text-[10px] font-bold text-gray-400">TERM 1 2026</span>
           </div>
           <div className="p-5 space-y-3">
             {activeChild?.marks ? Object.entries(activeChild.marks).map(([subject, score]: [string, any]) => (
@@ -520,7 +477,7 @@ export default function ParentPortalPage() {
                 </div>
               </div>
             )) : (
-              <div className="py-12 text-center text-gray-400 italic text-xs">No marks recorded yet for {activeChild?.studentName}.</div>
+              <div className="py-12 text-center text-gray-400 italic text-xs">No marks recorded yet.</div>
             )}
           </div>
         </div>
@@ -528,34 +485,21 @@ export default function ParentPortalPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-gray-50 flex items-center justify-between">
             <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-tight">
-              <Calendar className="w-4 h-4 text-blue-500" /> School Communications
+              <Calendar className="w-4 h-4 text-blue-500" /> Recent Updates
             </h4>
-            <button className="text-[10px] font-bold text-rose-600 hover:underline flex items-center gap-1">
-              VIEW ARCHIVE <ArrowRight className="w-2.5 h-2.5" />
-            </button>
           </div>
           <div className="p-5 space-y-3">
-            {msgsLoading ? (
-              <div className="py-12 text-center text-[10px] text-gray-400 font-bold uppercase animate-pulse">Syncing Announcements...</div>
-            ) : announcements.length > 0 ? (
-              announcements.slice(0, 5).map((msg: any) => (
-                <div key={msg.id} className="p-4 rounded-xl border border-gray-100 hover:border-rose-100 hover:bg-rose-50/20 transition-all cursor-default">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700 uppercase tracking-tighter">
-                      {msg.communicationType || 'General Update'}
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-medium">{new Date(msg.createdAt || Date.now()).toLocaleDateString()}</span>
-                  </div>
-                  <p className="text-xs text-gray-700 font-medium leading-relaxed">{msg.content}</p>
-                  <div className="flex items-center gap-1.5 mt-3 text-[9px] text-gray-400 italic">
-                    <Clock className="w-3 h-3" />
-                    <span>Office of Administration</span>
-                  </div>
+            {announcements.slice(0, 5).map((msg: any) => (
+              <div key={msg.id} className="p-4 rounded-xl border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700 uppercase">
+                    {msg.communicationType}
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-medium">{new Date(msg.createdAt).toLocaleDateString()}</span>
                 </div>
-              ))
-            ) : (
-              <div className="py-12 text-center text-gray-400 italic text-xs">No recent updates found.</div>
-            )}
+                <p className="text-xs text-gray-700 font-medium leading-relaxed">{msg.content}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -567,7 +511,7 @@ function ParentMetricCard({ icon, label, value, color, valueColor = "text-gray-8
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all group">
       <div className="flex items-center justify-between mb-3">
-        <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm`}>{icon}</div>
+        <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center group-hover:scale-110 shadow-sm`}>{icon}</div>
         <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Active</span>
       </div>
       <p className={`text-xl font-bold ${valueColor}`}>{value}</p>

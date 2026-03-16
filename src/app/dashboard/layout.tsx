@@ -67,32 +67,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Push Notification Logic
   useEffect(() => {
     if (!profile?.uid || typeof window === 'undefined') return;
 
     const setupNotifications = async () => {
       try {
         const messaging = getMessaging();
-        
-        // Request permission
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-          // Get FCM Token
-          // Note: In a production environment, you need a VAPID key from the Firebase Console
           const token = await getToken(messaging, { 
-            vapidKey: undefined // Replace with your real VAPID key
+            vapidKey: undefined 
           });
 
           if (token) {
             await notificationService.registerFCMToken(database, profile.uid, token);
-            console.log('FCM Token registered:', token);
           }
         }
 
-        // Handle foreground messages
         onMessage(messaging, (payload) => {
-          console.log('Foreground message received:', payload);
           toast({
             title: payload.notification?.title || 'New Notification',
             description: payload.notification?.body,
@@ -159,7 +151,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!profile) return null;
 
-  const isAdmin = profile.role === 'admin';
+  const isAdmin = profile.role === 'admin' || profile.role === 'staff';
   const isParent = profile.role === 'parent';
 
   const adminNav = [
@@ -173,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       label: 'PLATFORM',
       color: 'text-blue-400',
-      visible: isAdmin,
+      visible: profile.role === 'admin',
       items: [
         { title: 'Multi-School Mgmt', icon: Building2, href: '/dashboard/multi-school' },
         { title: 'Users & RBAC', icon: ShieldCheck, href: '/dashboard/users' },
@@ -186,7 +178,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { title: 'Admissions', icon: UserPlus, href: '/dashboard/admissions', badge: newAdmissionsCount > 0 ? newAdmissionsCount.toString() : null },
         { title: 'Pupil Management', icon: Users, href: '/dashboard/students' },
         { title: 'Parent Portal', icon: Heart, href: '/dashboard/parent-portal', visible: isAdmin },
-        { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr', visible: isAdmin },
+        { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr', visible: profile.role === 'admin' },
       ]
     },
     {
@@ -208,7 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { title: 'Transport', icon: Bus, href: '/dashboard/transport' },
         { title: 'Meals & Catering', icon: UtensilsCrossed, href: '/dashboard/catering' },
         { title: 'Health & Safety', icon: Stethoscope, href: '/dashboard/health' },
-        { title: 'Inventory & Assets', icon: Package, href: '/dashboard/inventory', visible: isAdmin },
+        { title: 'Inventory & Assets', icon: Package, href: '/dashboard/inventory', visible: profile.role === 'admin' },
       ]
     },
     {
@@ -224,7 +216,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       label: 'SYSTEM',
       color: 'text-gray-400',
-      visible: isAdmin,
+      visible: profile.role === 'admin',
       items: [
         { title: 'Integrations', icon: Globe, href: '/dashboard/integrations' },
         { title: 'System Admin', icon: Settings, href: '/dashboard/settings' },
@@ -322,16 +314,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <div className="px-3 py-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
-            <Input 
-              placeholder="Quick jump..." 
-              className="w-full bg-[#1A2742] text-gray-300 text-xs rounded-lg pl-8 py-2 border border-[#1E3A5F]/50 focus:border-teal-500/50 focus:ring-0 placeholder:text-gray-600 h-9"
-            />
-          </div>
-        </div>
-
         <div className="flex-1 overflow-y-auto px-3 pb-4 custom-scrollbar">
           {currentNav.map((group) => {
             if (group.visible === false) return null;
@@ -392,7 +374,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors md:hidden"
             >
               <Menu className="h-4.5 w-4.5" />
             </button>
@@ -405,7 +387,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Notifications Tray */}
             <Popover>
               <PopoverTrigger asChild>
                 <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
@@ -461,16 +442,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   )}
                 </div>
-                {(notifications || []).length > 0 && (
-                  <div className="p-2 bg-gray-50/50 border-t border-gray-100 text-center">
-                    <button 
-                      onClick={() => notificationService.clearNotifications(database, profile.uid)}
-                      className="text-[9px] font-bold text-gray-400 hover:text-rose-500 uppercase tracking-tighter"
-                    >
-                      Clear All History
-                    </button>
-                  </div>
-                )}
               </PopoverContent>
             </Popover>
 
@@ -479,14 +450,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-[11px] font-bold text-gray-800 leading-none">{profile.displayName || profile.email?.split('@')[0]}</p>
                 <p className="text-[9px] text-gray-400 mt-0.5 capitalize">{profile.role}</p>
               </div>
-              <div 
-                className="h-8 w-8 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center"
-                style={{ backgroundColor: primaryColor + '10' }}
-              >
+              <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center">
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
-                  <UserCircle className="h-6 w-6" style={{ color: primaryColor }} />
+                  <UserCircle className="h-6 w-6 text-gray-400" />
                 )}
               </div>
             </div>
