@@ -12,13 +12,22 @@ import {
   Upload,
   Link as LinkIcon,
   Palette,
-  Quote
+  Quote,
+  DollarSign,
+  Globe
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { useDatabase, useRTDBDoc } from '@/firebase';
 import { ref, set, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +41,16 @@ const PRESET_COLORS = [
   { name: 'Purple', value: '#6D28D9' },
   { name: 'Amber', value: '#B45309' },
   { name: 'Slate', value: '#1E293B' },
+];
+
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'ZWL', symbol: 'Z$', name: 'Zimbabwean Dollar' },
+  { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
+  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
 ];
 
 export default function SystemSettingsPage() {
@@ -50,7 +69,9 @@ export default function SystemSettingsPage() {
     phone: '',
     address: '',
     logoUrl: '',
-    primaryColor: '#0D9488'
+    primaryColor: '#0D9488',
+    currency: 'USD',
+    currencySymbol: '$'
   });
 
   useEffect(() => {
@@ -65,7 +86,9 @@ export default function SystemSettingsPage() {
         phone: schoolSettings.phone || '',
         address: schoolSettings.address || '',
         logoUrl: schoolSettings.logoUrl || '',
-        primaryColor: schoolSettings.primaryColor || '#0D9488'
+        primaryColor: schoolSettings.primaryColor || '#0D9488',
+        currency: schoolSettings.currency || 'USD',
+        currencySymbol: schoolSettings.currencySymbol || '$'
       });
     }
   }, [schoolSettings]);
@@ -82,6 +105,17 @@ export default function SystemSettingsPage() {
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCurrencyChange = (code: string) => {
+    const selected = CURRENCIES.find(c => c.code === code);
+    if (selected) {
+      setFormData({
+        ...formData,
+        currency: selected.code,
+        currencySymbol: selected.symbol
+      });
     }
   };
 
@@ -126,7 +160,7 @@ export default function SystemSettingsPage() {
           <TabsTrigger value="institution" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Institution Profile</TabsTrigger>
           <TabsTrigger value="branding" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Branding & Color</TabsTrigger>
           <TabsTrigger value="academic" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Academic Sessions</TabsTrigger>
-          <TabsTrigger value="notifications" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Notifications</TabsTrigger>
+          <TabsTrigger value="finance" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Finance & Localization</TabsTrigger>
         </TabsList>
 
         <TabsContent value="institution" className="space-y-6">
@@ -139,7 +173,7 @@ export default function SystemSettingsPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400">SCHOOL FULL NAME</Label>
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">School Full Name</Label>
                     <Input 
                       placeholder="e.g. Sunrise Academy" 
                       value={formData.schoolName}
@@ -147,7 +181,7 @@ export default function SystemSettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400">SHORT NAME / CODE</Label>
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Short Name / Code</Label>
                     <Input 
                       placeholder="e.g. SA" 
                       value={formData.shortName}
@@ -166,7 +200,7 @@ export default function SystemSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[11px] font-bold text-gray-400">INSTITUTIONAL EMAIL</Label>
+                  <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Institutional Email</Label>
                   <Input 
                     type="email" 
                     placeholder="admin@school.com" 
@@ -175,7 +209,7 @@ export default function SystemSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[11px] font-bold text-gray-400">OFFICE PHONE</Label>
+                  <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Office Phone</Label>
                   <Input 
                     placeholder="+263 7..." 
                     value={formData.phone}
@@ -183,7 +217,7 @@ export default function SystemSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[11px] font-bold text-gray-400">PHYSICAL ADDRESS</Label>
+                  <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Physical Address</Label>
                   <Input 
                     placeholder="Main Block, Education St." 
                     value={formData.address}
@@ -377,8 +411,59 @@ export default function SystemSettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="p-12 text-center text-gray-400 italic text-xs">
-          Notification templates and SMS gateway configuration...
+        <TabsContent value="finance">
+          <Card className="border-gray-100 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Finance & Localization</CardTitle>
+              <CardDescription className="text-xs">Configure how currency and billing information is displayed globally.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                      <DollarSign className="h-3 w-3" /> Institutional Currency
+                    </Label>
+                    <Select value={formData.currency} onValueChange={handleCurrencyChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map(c => (
+                          <SelectItem key={c.code} value={c.code}>{c.name} ({c.code} - {c.symbol})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Globe className="h-4 w-4 text-blue-600" />
+                      <p className="text-xs font-bold text-blue-800 uppercase tracking-tight">Localization Preview</p>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-blue-900">{formData.currencySymbol}1,250.00</span>
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{formData.currency}</span>
+                    </div>
+                    <p className="text-[10px] text-blue-600 mt-2 italic leading-relaxed">
+                      All financial modules, pupil ledgers, and inventory valuations will use this formatting.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Currency Code (Read Only)</Label>
+                    <Input value={formData.currency} readOnly className="bg-gray-50 font-mono text-xs" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Symbol (Read Only)</Label>
+                    <Input value={formData.currencySymbol} readOnly className="bg-gray-50 font-mono text-xs" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

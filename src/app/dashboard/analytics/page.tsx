@@ -28,7 +28,7 @@ import {
   PieChart,
   Pie
 } from 'recharts';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useRTDBDoc } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const COLORS = ['#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
@@ -37,8 +37,10 @@ export default function AnalyticsReportsPage() {
   const database = useDatabase();
   const { data: students, loading: studentsLoading } = useRTDBCollection(database, 'students');
   const { data: transactions, loading: txLoading } = useRTDBCollection(database, 'transactions');
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
 
   const loading = studentsLoading || txLoading;
+  const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const enrollmentByGrade = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -47,6 +49,11 @@ export default function AnalyticsReportsPage() {
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [students]);
+
+  const totalRevenue = useMemo(() => {
+    const total = (transactions || []).reduce((acc: number, tx: any) => acc + (tx.amount || 0), 0);
+    return total.toLocaleString();
+  }, [transactions]);
 
   const revenueData = useMemo(() => {
     // Simulated monthly revenue trend based on transactions
@@ -88,7 +95,7 @@ export default function AnalyticsReportsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnalyticsStat label="Total Pupils" value={loading ? '...' : students.length.toString()} trend="+4.2%" icon={<Users className="h-4 w-4" />} color="bg-blue-50 text-blue-600" />
         <AnalyticsStat label="Avg Attendance" value="94.8%" trend="+1.5%" icon={<Activity className="h-4 w-4" />} color="bg-emerald-50 text-emerald-600" />
-        <AnalyticsStat label="Total Revenue" value="$42,850" trend="+12.8%" icon={<DollarSign className="h-4 w-4" />} color="bg-amber-50 text-amber-600" />
+        <AnalyticsStat label="Total Revenue" value={loading ? '...' : `${currencySymbol}${totalRevenue}`} trend="+12.8%" icon={<DollarSign className="h-4 w-4" />} color="bg-amber-50 text-amber-600" />
         <AnalyticsStat label="Academic Cycle" value="Term 1" trend="2026 Active" icon={<Calendar className="h-4 w-4" />} color="bg-violet-50 text-violet-600" />
       </div>
 
@@ -115,7 +122,7 @@ export default function AnalyticsReportsPage() {
 
         <Card className="border-gray-100 shadow-sm overflow-hidden">
           <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-bold text-gray-800">Financial Growth Trend</CardTitle>
+            <CardTitle className="text-sm font-bold text-gray-800">Financial Growth Trend ({currencySymbol})</CardTitle>
             <CardDescription className="text-xs">Monthly revenue collection performance</CardDescription>
           </CardHeader>
           <CardContent>

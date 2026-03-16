@@ -29,7 +29,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile, useRTDBDoc } from '@/firebase';
 import { 
   Dialog, 
   DialogContent, 
@@ -62,6 +62,7 @@ export default function FinanceBillingPage() {
   
   const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
   const { data: transactions, loading: txLoading } = useRTDBCollection<Transaction>(database, 'transactions');
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
   
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -75,6 +76,7 @@ export default function FinanceBillingPage() {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const loading = studentsLoading || txLoading;
+  const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const stats = useMemo(() => {
     if (loading || !students || !transactions) return null;
@@ -212,7 +214,7 @@ export default function FinanceBillingPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <FinanceMetricCard 
           label="Total Billed" 
-          value={loading ? '...' : `$${stats?.totalBilled}`} 
+          value={loading ? '...' : `${currencySymbol}${stats?.totalBilled}`} 
           trend={`${stats?.growth}% growth`} 
           icon={<CreditCard className="w-4 h-4 text-blue-600" />} 
           color="bg-blue-50" 
@@ -220,7 +222,7 @@ export default function FinanceBillingPage() {
         />
         <FinanceMetricCard 
           label="Outstanding" 
-          value={loading ? '...' : `$${stats?.arrears}`} 
+          value={loading ? '...' : `${currencySymbol}${stats?.arrears}`} 
           trend={`${stats?.unpaidPct}% of total`} 
           icon={<Wallet className="w-4 h-4 text-amber-600" />} 
           color="bg-amber-50" 
@@ -280,7 +282,7 @@ export default function FinanceBillingPage() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee Amount ($)</Label>
+                          <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fee Amount ({currencySymbol})</Label>
                           <Input 
                             type="number" 
                             placeholder="0.00" 
@@ -318,7 +320,7 @@ export default function FinanceBillingPage() {
                         <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex gap-3">
                           <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                           <p className="text-[10px] text-amber-800 leading-relaxed">
-                            This will add <span className="font-bold">${feeAmount}</span> to the balance of every student in the <span className="font-bold">{selectedGrades.length}</span> selected grades. This action is irreversible.
+                            This will add <span className="font-bold">{currencySymbol}{feeAmount}</span> to the balance of every student in the <span className="font-bold">{selectedGrades.length}</span> selected grades. This action is irreversible.
                           </p>
                         </div>
                       )}
@@ -356,13 +358,13 @@ export default function FinanceBillingPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {students.map(s => (
-                              <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade}) — Bal: ${s.feeBalance}</SelectItem>
+                              <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade}) — Bal: {currencySymbol}{s.feeBalance}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>Amount to Pay ($)</Label>
+                        <Label>Amount to Pay ({currencySymbol})</Label>
                         <Input name="amount" type="number" step="0.01" placeholder="0.00" required />
                       </div>
                       <div className="space-y-2">
@@ -432,7 +434,7 @@ export default function FinanceBillingPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-500 font-medium">{student.grade}</td>
                           <td className={`px-4 py-3 text-right font-bold ${balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                            ${balance.toFixed(2)}
+                            {currencySymbol}{balance.toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${balance > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -501,7 +503,7 @@ export default function FinanceBillingPage() {
               <div className="flex items-start gap-2 p-2 bg-white rounded-lg border border-emerald-50 shadow-sm">
                 <ArrowDownRight className="w-3.5 h-3.5 text-amber-500 mt-0.5" />
                 <p className="text-[10px] text-gray-600 leading-relaxed font-medium">
-                  Total outstanding arrears currently stand at <span className="font-bold text-amber-600">${stats?.arrears}</span>. This is <span className="font-bold">{stats?.unpaidPct}%</span> of the terminal billing.
+                  Total outstanding arrears currently stand at <span className="font-bold text-amber-600">{currencySymbol}{stats?.arrears}</span>. This is <span className="font-bold">{stats?.unpaidPct}%</span> of the terminal billing.
                 </p>
               </div>
             </CardContent>

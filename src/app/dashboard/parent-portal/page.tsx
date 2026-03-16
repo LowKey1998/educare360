@@ -28,7 +28,7 @@ import {
   Check,
   X
 } from 'lucide-react';
-import { useUserProfile, useDatabase, useRTDBCollection } from '@/firebase';
+import { useUserProfile, useDatabase, useRTDBCollection, useRTDBDoc } from '@/firebase';
 import { 
   Dialog, 
   DialogContent, 
@@ -61,6 +61,7 @@ export default function ParentPortalPage() {
   const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
   const { data: users, loading: usersLoading } = useRTDBCollection<UserProfile>(database, 'users');
   const { data: announcements, loading: msgsLoading } = useRTDBCollection(database, 'announcements');
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
   
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -78,6 +79,7 @@ export default function ParentPortalPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
+  const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const myChildren = useMemo(() => {
     if (!students || !profile?.email) return [];
@@ -457,7 +459,7 @@ export default function ParentPortalPage() {
             </div>
             <div>
               <h2 className="text-lg font-bold">Welcome, {profile?.displayName || 'Parent'}</h2>
-              <p className="text-xs text-white/80">Managing Family Progress at Sunrise Academy</p>
+              <p className="text-xs text-white/80">Managing Family Progress at {schoolSettings?.schoolName || 'Sunrise Academy'}</p>
             </div>
           </div>
           
@@ -490,7 +492,7 @@ export default function ParentPortalPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <ParentMetricCard icon={<Award className="w-4 h-4 text-rose-600" />} label="Subjects Graded" value={activeChild?.marks ? Object.keys(activeChild.marks).length.toString() : '0'} color="bg-rose-50" />
         <ParentMetricCard icon={<TrendingUp className="w-4 h-4 text-emerald-600" />} label="Attendance Rate" value={`${activeChild?.attendanceRate || 0}%`} color="bg-emerald-50" />
-        <ParentMetricCard icon={<DollarSign className="w-4 h-4 text-amber-600" />} label="Fee Balance" value={`$${activeChild?.feeBalance || 0}`} color="bg-amber-50" 
+        <ParentMetricCard icon={<DollarSign className="w-4 h-4 text-amber-600" />} label="Fee Balance" value={`${currencySymbol}${activeChild?.feeBalance || 0}`} color="bg-amber-50" 
           valueColor={parseFloat(activeChild?.feeBalance as any) > 0 ? "text-rose-600" : "text-emerald-600"} />
         <ParentMetricCard icon={<MessageSquare className="w-4 h-4 text-blue-600" />} label="Updates" value={msgsLoading ? '...' : announcements.length.toString()} color="bg-blue-50" />
       </div>

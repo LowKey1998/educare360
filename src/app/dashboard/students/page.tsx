@@ -21,7 +21,7 @@ import {
   ShieldCheck,
   Phone
 } from 'lucide-react';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useRTDBDoc } from '@/firebase';
 import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
@@ -48,14 +48,16 @@ export default function PupilManagementPage() {
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('All Grades');
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isSubmitting, setIsAddSubmitting] = useState(false);
+  const [isAddSubmitting, setIsAddSubmitting] = useState(false);
   
   const database = useDatabase();
   const { toast } = useToast();
   const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
   const { data: users, loading: usersLoading } = useRTDBCollection<UserProfile>(database, 'users');
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
 
   const loading = studentsLoading || usersLoading;
+  const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const filteredStudents = useMemo(() => {
     if (!students) return [];
@@ -119,7 +121,7 @@ export default function PupilManagementPage() {
   };
 
   const isParentRegistered = (email: string) => {
-    return users.some(u => u.email?.toLowerCase() === email?.toLowerCase() && u.role === 'parent');
+    return (users || []).some(u => u.email?.toLowerCase() === email?.toLowerCase() && u.role === 'parent');
   };
 
   return (
@@ -228,8 +230,8 @@ export default function PupilManagementPage() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={isSubmitting} className="w-full bg-teal-600">
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    <Button type="submit" disabled={isAddSubmitting} className="w-full bg-teal-600">
+                      {isAddSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                       Complete Enrollment
                     </Button>
                   </DialogFooter>
@@ -289,7 +291,7 @@ export default function PupilManagementPage() {
                     </td>
                     <td className="px-4 py-4 text-right">
                       <p className={`font-mono font-bold ${student.feeBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        ${(student.feeBalance || 0).toFixed(2)}
+                        {currencySymbol}{(student.feeBalance || 0).toFixed(2)}
                       </p>
                     </td>
                     <td className="px-4 py-4 text-center">

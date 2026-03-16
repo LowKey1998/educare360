@@ -25,7 +25,7 @@ import {
   Calculator,
   TrendingUp
 } from 'lucide-react';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useRTDBDoc } from '@/firebase';
 import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
@@ -58,6 +58,9 @@ export default function InventoryManagementPage() {
   const database = useDatabase();
   const { toast } = useToast();
   const { data: assets, loading } = useRTDBCollection(database, 'assets');
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+
+  const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const filteredAssets = useMemo(() => {
     return assets.filter((a: any) => {
@@ -133,7 +136,7 @@ export default function InventoryManagementPage() {
         <MetricCard label="Total Assets" value={loading ? '...' : stats.total.toString()} trend="Registry" icon={<Package className="h-4.5 w-4.5 text-blue-600" />} color="bg-blue-50" />
         <MetricCard label="Needs Repair" value={loading ? '...' : stats.repair.toString()} trend="Attention" icon={<Wrench className="h-4.5 w-4.5 text-amber-600" />} color="bg-amber-50" />
         <MetricCard label="Low Stock" value="5" trend="Alerts" icon={<TriangleAlert className="h-4.5 w-4.5 text-red-600" />} color="bg-red-50" />
-        <MetricCard label="Asset Valuation" value={loading ? '...' : `$${stats.totalValue.toLocaleString()}`} trend={`${stats.valueTrend}% of cost`} icon={<ChartColumn className="h-4.5 w-4.5 text-green-600" />} color="bg-green-50" />
+        <MetricCard label="Asset Valuation" value={loading ? '...' : `${currencySymbol}${stats.totalValue.toLocaleString()}`} trend={`${stats.valueTrend}% of cost`} icon={<ChartColumn className="h-4.5 w-4.5 text-green-600" />} color="bg-green-50" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
@@ -182,8 +185,8 @@ export default function InventoryManagementPage() {
                           <Input name="serial" placeholder="Serial No" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                          <Input name="cost" type="number" placeholder="Purchase Cost" required />
-                          <Input name="value" type="number" placeholder="Current Value" required />
+                          <Input name="cost" type="number" placeholder={`Purchase Cost (${currencySymbol})`} required />
+                          <Input name="value" type="number" placeholder={`Current Value (${currencySymbol})`} required />
                         </div>
                       </div>
                       <DialogFooter><Button type="submit" disabled={isSubmitting}>Confirm</Button></DialogFooter>
@@ -210,7 +213,7 @@ export default function InventoryManagementPage() {
                         <tr key={asset.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 font-medium">{asset.name}</td>
                           <td className="px-4 py-3">{asset.category}</td>
-                          <td className="px-4 py-3 text-right font-bold">${asset.value}</td>
+                          <td className="px-4 py-3 text-right font-bold">{currencySymbol}{asset.value}</td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => remove(ref(database, `assets/${asset.id}`))} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                           </td>

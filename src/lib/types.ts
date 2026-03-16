@@ -25,6 +25,9 @@ export interface Student {
   status: string;
   marks?: Record<string, number>;
   lastAcademicUpdate?: any;
+  lastBillingTerm?: string;
+  lastBillingDate?: any;
+  lastRegistryUpdate?: any;
   createdAt?: any;
 }
 
@@ -37,6 +40,8 @@ export interface Admission {
   submissionDate: string;
   docsPending: boolean;
   applicationId: string;
+  enrolledId?: string;
+  enrollmentDate?: any;
   createdAt?: any;
 }
 
@@ -168,6 +173,8 @@ export interface SystemSettings {
   address: string;
   logoUrl: string;
   primaryColor: string;
+  currency: string;
+  currencySymbol: string;
   updatedAt?: any;
 }
 

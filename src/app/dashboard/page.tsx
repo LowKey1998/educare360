@@ -20,7 +20,7 @@ import {
   Award,
   ArrowRight
 } from 'lucide-react';
-import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile, useRTDBDoc } from '@/firebase';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -32,8 +32,10 @@ export default function DashboardPage() {
   const { data: users, loading: usersLoading } = useRTDBCollection(database, 'users');
   const { data: announcements, loading: announcementsLoading } = useRTDBCollection(database, 'announcements');
   const { data: transactions } = useRTDBCollection(database, 'transactions');
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
 
   const loading = studentsLoading || admissionsLoading || usersLoading || profileLoading || announcementsLoading;
+  const currencySymbol = schoolSettings?.currencySymbol || '$';
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const isParent = profile?.role === 'parent';
@@ -63,7 +65,7 @@ export default function DashboardPage() {
     
     // Attendance
     const avgAttendance = students.length > 0 
-      ? students.reduce((acc, s) => acc + (parseFloat(s.attendanceRate) || 0), 0) / students.length 
+      ? students.reduce((acc, s) => acc + (parseFloat(s.attendanceRate as any) || 0), 0) / students.length 
       : 0;
 
     return {
@@ -105,10 +107,10 @@ export default function DashboardPage() {
         <div className="bg-gradient-to-r from-rose-600 to-pink-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
           <div className="relative z-10">
             <h2 className="text-xl font-bold">Welcome back, {profile?.displayName || 'Parent'}</h2>
-            <p className="text-sm text-white/80 mt-1">Managing your family's educational journey at Sunrise Academy.</p>
+            <p className="text-sm text-white/80 mt-1">Managing your family's educational journey at {schoolSettings?.schoolName || 'Sunrise Academy'}.</p>
             <div className="flex flex-wrap gap-3 mt-4">
               <HeroMetric label="My Children" value={parentStats.childCount.toString()} />
-              <HeroMetric label="Total Arrears" value={`$${parentStats.arrears}`} />
+              <HeroMetric label="Total Arrears" value={`${currencySymbol}${parentStats.arrears}`} />
               <HeroMetric label="Avg Attendance" value={`${parentStats.attendance}%`} />
             </div>
           </div>
@@ -208,7 +210,7 @@ export default function DashboardPage() {
           <p className="text-sm text-white/70 mt-1">Institutional Overview for {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}.</p>
           <div className="flex flex-wrap gap-3 mt-4">
             <HeroMetric label="Global Enrollment" value={stats.totalEnrolment.toString()} />
-            <HeroMetric label="Revenue To Date" value={`$${stats.revenue}`} />
+            <HeroMetric label="Revenue To Date" value={`${currencySymbol}${stats.revenue}`} />
             <HeroMetric label="New Apps" value={stats.newApps.toString()} />
             <HeroMetric label="Workforce" value={stats.staffCount.toString()} />
           </div>
@@ -217,7 +219,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard title="Enrolment" value={stats.totalEnrolment.toString()} trend={stats.enrolmentTrend} isPositive={true} icon={<Users className="w-5 h-5" />} color="bg-blue-50 text-blue-600" />
-        <StatCard title="Revenue" value={`$${stats.revenue}`} trend={stats.revenueTrend} isPositive={true} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
+        <StatCard title="Revenue" value={`${currencySymbol}${stats.revenue}`} trend={stats.revenueTrend} isPositive={true} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
         <StatCard title="Attendance" value={`${stats.attendance}%`} trend="Live" isPositive={true} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
         <StatCard title="Staff" value={stats.staffCount.toString()} trend="Active" isPositive={true} icon={<Briefcase className="w-5 h-5" />} color="bg-rose-50 text-rose-600" />
         <StatCard title="Applications" value={stats.newApps.toString()} trend="Pending" isPositive={true} icon={<UserPlus className="w-5 h-5" />} color="bg-indigo-50 text-indigo-600" />
