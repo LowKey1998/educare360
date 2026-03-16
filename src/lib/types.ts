@@ -175,6 +175,11 @@ export interface SystemSettings {
   primaryColor: string;
   currency: string;
   currencySymbol: string;
+  facebookUrl?: string;
+  twitterUrl?: string;
+  instagramUrl?: string;
+  privacyPolicy?: string;
+  termsAndConditions?: string;
   updatedAt?: any;
 }
 

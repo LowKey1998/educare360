@@ -14,12 +14,18 @@ import {
   Palette,
   Quote,
   DollarSign,
-  Globe
+  Globe,
+  Facebook,
+  Twitter,
+  Instagram,
+  FileText,
+  ShieldAlert
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Select, 
@@ -71,7 +77,12 @@ export default function SystemSettingsPage() {
     logoUrl: '',
     primaryColor: '#0D9488',
     currency: 'USD',
-    currencySymbol: '$'
+    currencySymbol: '$',
+    facebookUrl: '',
+    twitterUrl: '',
+    instagramUrl: '',
+    privacyPolicy: '',
+    termsAndConditions: ''
   });
 
   useEffect(() => {
@@ -88,7 +99,12 @@ export default function SystemSettingsPage() {
         logoUrl: schoolSettings.logoUrl || '',
         primaryColor: schoolSettings.primaryColor || '#0D9488',
         currency: schoolSettings.currency || 'USD',
-        currencySymbol: schoolSettings.currencySymbol || '$'
+        currencySymbol: schoolSettings.currencySymbol || '$',
+        facebookUrl: schoolSettings.facebookUrl || '',
+        twitterUrl: schoolSettings.twitterUrl || '',
+        instagramUrl: schoolSettings.instagramUrl || '',
+        privacyPolicy: schoolSettings.privacyPolicy || '',
+        termsAndConditions: schoolSettings.termsAndConditions || ''
       });
     }
   }, [schoolSettings]);
@@ -158,7 +174,8 @@ export default function SystemSettingsPage() {
       <Tabs defaultValue="institution" className="w-full">
         <TabsList className="bg-white border border-gray-100 p-1 rounded-xl shadow-sm h-auto gap-1 mb-6">
           <TabsTrigger value="institution" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Institution Profile</TabsTrigger>
-          <TabsTrigger value="branding" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Branding & Color</TabsTrigger>
+          <TabsTrigger value="branding" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Branding & Social</TabsTrigger>
+          <TabsTrigger value="legal" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Legal & Policies</TabsTrigger>
           <TabsTrigger value="academic" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Academic Sessions</TabsTrigger>
           <TabsTrigger value="finance" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Finance & Localization</TabsTrigger>
         </TabsList>
@@ -259,112 +276,136 @@ export default function SystemSettingsPage() {
         </TabsContent>
 
         <TabsContent value="branding" className="space-y-6">
-          <Card className="border-gray-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm">Institutional Visual Identity</CardTitle>
-              <CardDescription className="text-xs">Select your brand color and upload your school logo.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  {/* Color Selector */}
-                  <div className="space-y-3">
-                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
-                      <Palette className="h-3 w-3" /> Brand Primary Color
-                    </Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {PRESET_COLORS.map((color) => (
-                        <button
-                          key={color.value}
-                          onClick={() => setFormData(prev => ({ ...prev, primaryColor: color.value }))}
-                          className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
-                            formData.primaryColor === color.value ? 'border-gray-800 scale-105 shadow-sm' : 'border-transparent'
-                          }`}
-                          style={{ backgroundColor: color.value }}
-                          title={color.name}
-                        >
-                          {formData.primaryColor === color.value && <CheckCircle2 className="h-4 w-4 text-white" />}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex-1">
-                        <Label className="text-[10px] text-gray-400">Custom Hex Code</Label>
-                        <Input 
-                          value={formData.primaryColor}
-                          onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
-                          className="h-9 text-xs font-mono"
-                          placeholder="#000000"
-                        />
-                      </div>
-                      <div className="w-9 h-9 rounded-lg border border-gray-200 mt-5" style={{ backgroundColor: formData.primaryColor }} />
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-gray-100"></span>
-                    </div>
-                    <div className="relative flex justify-center text-[10px] uppercase font-bold">
-                      <span className="bg-white px-2 text-gray-300">Identity Resources</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
-                      <LinkIcon className="h-3 w-3" /> Logo Image URL
-                    </Label>
-                    <Input 
-                      placeholder="https://example.com/logo.png" 
-                      value={formData.logoUrl}
-                      onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
-                      <Upload className="h-3 w-3" /> Upload Logo File
-                    </Label>
-                    <Input 
-                      type="file" 
-                      accept="image/*" 
-                      className="text-xs" 
-                      onChange={handleLogoUpload}
-                    />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-gray-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Institutional Visual Identity</CardTitle>
+                <CardDescription className="text-xs">Select your brand color and upload your school logo.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Palette className="h-3 w-3" /> Brand Primary Color
+                  </Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PRESET_COLORS.map((color) => (
+                      <button
+                        key={color.value}
+                        onClick={() => setFormData(prev => ({ ...prev, primaryColor: color.value }))}
+                        className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
+                          formData.primaryColor === color.value ? 'border-gray-800 scale-105 shadow-sm' : 'border-transparent'
+                        }`}
+                        style={{ backgroundColor: color.value }}
+                        title={color.name}
+                      >
+                        {formData.primaryColor === color.value && <CheckCircle2 className="h-4 w-4 text-white" />}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-center space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Branding Preview</p>
-                    <div 
-                      className="w-32 h-32 rounded-3xl p-2 shadow-xl flex items-center justify-center overflow-hidden mx-auto transition-colors duration-500" 
-                      style={{ backgroundColor: formData.primaryColor }}
-                    >
-                      {formData.logoUrl ? (
-                        <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                      ) : (
-                        <span className="text-4xl font-bold text-white">{formData.shortName?.[0] || 'E'}</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="w-full max-w-[200px] space-y-2">
-                    <div className="h-8 rounded-lg w-full" style={{ backgroundColor: formData.primaryColor + '20' }}>
-                      <div className="h-full rounded-lg w-1/3" style={{ backgroundColor: formData.primaryColor }} />
-                    </div>
-                    <p className="text-[9px] text-gray-400 italic">Example component theming using your primary brand color.</p>
-                  </div>
-
-                  {formData.logoUrl && (
-                    <Button variant="outline" size="sm" onClick={() => setFormData(prev => ({...prev, logoUrl: ''}))} className="text-red-500 hover:text-red-600 border-red-100 hover:bg-red-50 text-[10px] h-7">
-                      Remove Logo
-                    </Button>
-                  )}
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <LinkIcon className="h-3 w-3" /> Logo Image URL
+                  </Label>
+                  <Input 
+                    placeholder="https://example.com/logo.png" 
+                    value={formData.logoUrl}
+                    onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
+                  />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Upload className="h-3 w-3" /> Upload Logo File
+                  </Label>
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    className="text-xs" 
+                    onChange={handleLogoUpload}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-gray-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm">Social Presence</CardTitle>
+                <CardDescription className="text-xs">Connect your institution's social media accounts.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Facebook className="h-3.5 w-3.5 text-blue-600" /> Facebook Page URL
+                  </Label>
+                  <Input 
+                    placeholder="https://facebook.com/yourschool" 
+                    value={formData.facebookUrl}
+                    onChange={(e) => setFormData({...formData, facebookUrl: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Twitter className="h-3.5 w-3.5 text-sky-500" /> Twitter (X) URL
+                  </Label>
+                  <Input 
+                    placeholder="https://twitter.com/yourschool" 
+                    value={formData.twitterUrl}
+                    onChange={(e) => setFormData({...formData, twitterUrl: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Instagram className="h-3.5 w-3.5 text-pink-600" /> Instagram URL
+                  </Label>
+                  <Input 
+                    placeholder="https://instagram.com/yourschool" 
+                    value={formData.instagramUrl}
+                    onChange={(e) => setFormData({...formData, instagramUrl: e.target.value})}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="legal" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-gray-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gray-500" /> Terms & Conditions
+                </CardTitle>
+                <CardDescription className="text-xs">Institutional terms for parents and staff.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea 
+                  placeholder="Enter your school's terms and conditions here..."
+                  className="min-h-[300px] text-xs leading-relaxed"
+                  value={formData.termsAndConditions}
+                  onChange={(e) => setFormData({...formData, termsAndConditions: e.target.value})}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="border-gray-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-teal-600" /> Privacy Policy
+                </CardTitle>
+                <CardDescription className="text-xs">Data handling and student privacy policies.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea 
+                  placeholder="Enter your privacy policy details here..."
+                  className="min-h-[300px] text-xs leading-relaxed"
+                  value={formData.privacyPolicy}
+                  onChange={(e) => setFormData({...formData, privacyPolicy: e.target.value})}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="academic">

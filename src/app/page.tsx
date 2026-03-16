@@ -14,7 +14,10 @@ import {
   Sparkles,
   Heart,
   CheckCircle2,
-  Lock
+  Lock,
+  Facebook,
+  Twitter,
+  Instagram
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -195,13 +198,30 @@ export default function LandingPage() {
               <p className="text-sm text-gray-400 leading-relaxed">
                 Transforming the educational landscape through integrated technology and data-driven insights.
               </p>
+              <div className="flex gap-4">
+                {schoolSettings?.facebookUrl && (
+                  <a href={schoolSettings.facebookUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                    <Facebook className="h-4 w-4" />
+                  </a>
+                )}
+                {schoolSettings?.twitterUrl && (
+                  <a href={schoolSettings.twitterUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                    <Twitter className="h-4 w-4" />
+                  </a>
+                )}
+                {schoolSettings?.instagramUrl && (
+                  <a href={schoolSettings.instagramUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
             </div>
             <div>
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Institution</h4>
               <ul className="space-y-4 text-sm text-gray-400">
                 <li><Link href="#" className="hover:text-white transition-colors">About Us</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Academic Calendar</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Admissions</Link></li>
+                <li><Link href="/dashboard/calendar" className="hover:text-white transition-colors">Academic Calendar</Link></li>
+                <li><Link href="/dashboard/admissions" className="hover:text-white transition-colors">Admissions</Link></li>
                 <li><Link href="#" className="hover:text-white transition-colors">Contact</Link></li>
               </ul>
             </div>
@@ -209,9 +229,9 @@ export default function LandingPage() {
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Support</h4>
               <ul className="space-y-4 text-sm text-gray-400">
                 <li><Link href="#" className="hover:text-white transition-colors">Help Center</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Parent Guide</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">API Docs</Link></li>
+                <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link></li>
+                <li><Link href="/dashboard/integrations" className="hover:text-white transition-colors">API Docs</Link></li>
               </ul>
             </div>
             <div className="space-y-6">
@@ -226,9 +246,9 @@ export default function LandingPage() {
           <div className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-gray-500 uppercase font-bold tracking-widest">
             <p>&copy; {new Date().getFullYear()} {schoolName} Unified. All rights reserved.</p>
             <div className="flex gap-8">
-              <Link href="#" className="hover:text-white transition-colors">Facebook</Link>
-              <Link href="#" className="hover:text-white transition-colors">Twitter</Link>
-              <Link href="#" className="hover:text-white transition-colors">LinkedIn</Link>
+              <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+              <Link href="/login" className="hover:text-white transition-colors">Staff Portal</Link>
             </div>
           </div>
         </div>
