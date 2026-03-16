@@ -66,7 +66,7 @@ export default function ParentPortalPage() {
   const [search, setSearch] = useState('');
   
   // UI States
-  const [isEditEmailOpen, setIsEditEditEmailOpen] = useState(false);
+  const [isEditEmailOpen, setIsEditEmailOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   
   // Action States
@@ -143,7 +143,7 @@ export default function ParentPortalPage() {
     setIsUpdating(true);
     try {
       await studentService.updateParentEmail(database, editingStudent.id, newEmail);
-      setIsEditEditEmailOpen(false);
+      setIsEditEmailOpen(false);
       setEditingStudent(null);
       toast({ title: "Email Updated", description: "Parent contact record synchronized." });
     } catch (e) {
@@ -274,7 +274,7 @@ export default function ParentPortalPage() {
                         onClick={() => {
                           setEditingStudent(s);
                           setNewEmail(s.parentEmail);
-                          setIsEditEditEmailOpen(true);
+                          setIsEditEmailOpen(true);
                         }}
                         className="p-1 text-gray-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
                       >
