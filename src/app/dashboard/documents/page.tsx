@@ -32,10 +32,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, remove } from 'firebase/database';
+import { ref, remove, update } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 
-const TEMPLATES_DATA = [
+const SYSTEM_TEMPLATES = [
   {
     id: 'RCT-001',
     title: 'Primary School Report Card',
@@ -77,7 +77,8 @@ export default function DocumentBuilderPage() {
   const { data: dbTemplates, loading } = useRTDBCollection(database, 'document_templates');
 
   const allTemplates = useMemo(() => {
-    const combined = [...TEMPLATES_DATA];
+    // Combine system defaults with real data from database
+    const combined = [...SYSTEM_TEMPLATES];
     dbTemplates.forEach(t => {
       if (!combined.find(ct => ct.id === t.id)) {
         combined.push(t);
@@ -94,16 +95,30 @@ export default function DocumentBuilderPage() {
   }, [allTemplates, search, activeType]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this template?')) return;
+    if (id.startsWith('RCT-')) {
+      toast({ title: "System Template", description: "Default system templates cannot be deleted.", variant: "destructive" });
+      return;
+    }
+    if (!confirm('Permanently delete this template?')) return;
     try {
-      if (id.startsWith('RCT-')) {
-        toast({ title: "System Template", description: "Demo templates cannot be deleted.", variant: "destructive" });
-        return;
-      }
       await remove(ref(database, `document_templates/${id}`));
-      toast({ title: "Template Removed", description: "The document template was deleted." });
+      toast({ title: "Template Removed", description: "The document template was deleted successfully." });
     } catch (e) {
-      toast({ title: "Error", description: "Failed to delete template." });
+      toast({ title: "Error", description: "Failed to delete template.", variant: "destructive" });
+    }
+  };
+
+  const handleToggleStatus = async (template: any) => {
+    if (template.id.startsWith('RCT-')) {
+      toast({ title: "Read Only", description: "System template states are locked.", variant: "destructive" });
+      return;
+    }
+    const newStatus = template.status === 'Active' ? 'Draft' : 'Active';
+    try {
+      await update(ref(database, `document_templates/${template.id}`), { status: newStatus });
+      toast({ title: "Status Updated", description: `Template is now ${newStatus}.` });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to update status." });
     }
   };
 
@@ -120,14 +135,14 @@ export default function DocumentBuilderPage() {
           <p className="text-xs text-gray-500 mt-0.5">Design templates, generate documents, and manage school paperwork</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => toast({ title: "Exporting", description: "Preparing template bundle..." })}>
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => toast({ title: "Exporting", description: "Preparing template bundle for download..." })}>
             <Download className="h-3.5 w-3.5" /> Export All
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <DocStatCard label="Templates Created" value="24" trend="+3" isPositive={true} icon={<PanelsTopLeft className="w-4.5 h-4.5 text-blue-600" />} color="bg-blue-50" />
+        <DocStatCard label="Templates Created" value={loading ? '...' : allTemplates.length.toString()} trend="+3" isPositive={true} icon={<PanelsTopLeft className="w-4.5 h-4.5 text-blue-600" />} color="bg-blue-50" />
         <DocStatCard label="Generated This Term" value="1,847" trend="+156" isPositive={true} icon={<FileText className="w-4.5 h-4.5 text-green-600" />} color="bg-green-50" />
         <DocStatCard label="Pending Approvals" value="12" trend="-4" isPositive={false} icon={<Clock className="w-4.5 h-4.5 text-amber-600" />} color="bg-amber-50" />
         <DocStatCard label="Bulk Jobs Complete" value="98%" trend="+2%" isPositive={true} icon={<CircleCheckBig className="w-4.5 h-4.5 text-purple-600" />} color="bg-purple-50" />
@@ -158,50 +173,53 @@ export default function DocumentBuilderPage() {
             </TabsList>
           </div>
 
-          <TabsContent value={activeType} className="m-0">
-            <div className="p-5">
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                    <Input 
-                      placeholder="Search templates..." 
-                      className="pl-9 text-xs h-9 border-gray-200" 
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-9 gap-1.5 text-gray-600">
-                      <Users className="h-3.5 w-3.5" /> Bulk Generate
-                    </Button>
-                    <Button className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium" onClick={() => toast({ title: "Document Studio", description: "Initializing template designer..." })}>
-                      <Plus className="h-3.5 w-3.5" /> New Template
-                    </Button>
-                  </div>
+          <div className="p-5">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <Input 
+                    placeholder="Search templates..." 
+                    className="pl-9 text-xs h-9 border-gray-200 focus:ring-teal-500" 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
-
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-2" />
-                    <p className="text-xs text-gray-400 italic">Syncing template library...</p>
-                  </div>
-                ) : filteredTemplates.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredTemplates.map((template) => (
-                      <TemplateCard key={template.id} template={template} onDelete={() => handleDelete(template.id)} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-20 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                    <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                    <p className="text-sm text-gray-400 font-medium">No templates found in this category.</p>
-                    <p className="text-xs text-gray-300 mt-1">Start by creating a new template or changing filters.</p>
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-9 gap-1.5 text-gray-600" onClick={() => toast({ title: "Bulk Job", description: "Select students to begin generation." })}>
+                    <Users className="h-3.5 w-3.5" /> Bulk Generate
+                  </Button>
+                  <Button className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium" onClick={() => toast({ title: "Document Studio", description: "Initializing template designer..." })}>
+                    <Plus className="h-3.5 w-3.5" /> New Template
+                  </Button>
+                </div>
               </div>
+
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-2" />
+                  <p className="text-xs text-gray-400 italic">Syncing template library...</p>
+                </div>
+              ) : filteredTemplates.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredTemplates.map((template) => (
+                    <TemplateCard 
+                      key={template.id} 
+                      template={template} 
+                      onDelete={() => handleDelete(template.id)} 
+                      onToggleStatus={() => handleToggleStatus(template)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                  <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm text-gray-400 font-medium">No templates found in this category.</p>
+                  <p className="text-xs text-gray-300 mt-1">Start by creating a new template or changing filters.</p>
+                </div>
+              )}
             </div>
-          </TabsContent>
+          </div>
         </Tabs>
       </div>
     </div>
@@ -228,13 +246,14 @@ function DocStatCard({ label, value, trend, icon, color, isPositive }: any) {
   );
 }
 
-function TemplateCard({ template, onDelete }: any) {
+function TemplateCard({ template, onDelete, onToggleStatus }: any) {
   const isDraft = template.status === 'Draft';
+  const isSystem = template.id.startsWith('RCT-');
   
   return (
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 h-44 relative overflow-hidden shrink-0">
-        <div className="bg-white rounded-lg shadow-sm p-3 h-full overflow-hidden border border-gray-200 scale-95 origin-top transition-transform group-hover:scale-100">
+        <div className="bg-white rounded-lg shadow-sm p-3 h-full overflow-hidden border border-gray-200 scale-95 origin-top transition-transform hover:scale-100">
           <div className="flex items-center gap-1.5 mb-2">
             <div className="w-4 h-4 rounded flex items-center justify-center bg-amber-100">
               <ImageIcon className="w-2.5 h-2.5 text-amber-700" />
@@ -264,6 +283,11 @@ function TemplateCard({ template, onDelete }: any) {
         }`}>
           {template.status}
         </span>
+        {isSystem && (
+          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-600 text-white shadow-sm">
+            SYSTEM
+          </span>
+        )}
       </div>
       
       <div className="p-4 flex-1">
@@ -289,10 +313,13 @@ function TemplateCard({ template, onDelete }: any) {
         <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-teal-600 transition-colors" title="Preview"><Eye className="h-3.5 w-3.5" /></button>
         <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-blue-600 transition-colors" title="Design"><PenLine className="h-3.5 w-3.5" /></button>
         <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-purple-600 transition-colors" title="Duplicate"><Copy className="h-3.5 w-3.5" /></button>
-        <button className="px-2 py-1 rounded-lg text-[10px] font-bold hover:bg-white text-gray-500 uppercase tracking-tighter transition-colors">
+        <button 
+          onClick={onToggleStatus}
+          className="px-2 py-1 rounded-lg text-[10px] font-bold hover:bg-white text-gray-500 uppercase tracking-tighter transition-colors"
+        >
           {template.status === 'Active' ? 'Deactivate' : 'Activate'}
         </button>
-        <button onClick={() => onDelete(template.id)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-red-600 transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
     </div>
   );
