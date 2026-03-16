@@ -230,7 +230,7 @@ export default function DashboardPage() {
           <AdminQuickAction href="/dashboard/admissions" icon={<UserPlus className="w-4 h-4" />} label="New Admission" color="bg-blue-500" />
           <AdminQuickAction href="/dashboard/finance" icon={<DollarSign className="w-4 h-4" />} label="Record Payment" color="bg-green-500" />
           <AdminQuickAction href="/dashboard/attendance" icon={<ClipboardCheck className="w-4 h-4" />} label="Take Attendance" color="bg-amber-500" />
-          <AdminQuickAction href="/dashboard/communication" icon={<MessageSquare className="w-4 h-4" />} label="Send Message" color="bg-purple-500" />
+          <AdminQuickAction href="/dashboard/communication" icon={<MessageSquare className="h-4 w-4" />} label="Send Message" color="bg-purple-500" />
           <AdminQuickAction href="/dashboard/documents" icon={<FileText className="w-4 h-4" />} label="Generate Reports" color="bg-rose-500" />
           <AdminQuickAction href="/dashboard/calendar" icon={<Calendar className="w-4 h-4" />} label="View Calendar" color="bg-teal-500" />
         </div>
