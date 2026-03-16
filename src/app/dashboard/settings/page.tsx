@@ -13,7 +13,10 @@ import {
   Globe,
   Mail,
   Phone,
-  CheckCircle2
+  CheckCircle2,
+  Upload,
+  Link as LinkIcon,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDatabase, useRTDBDoc } from '@/firebase';
 import { ref, set, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 export default function SystemSettingsPage() {
   const database = useDatabase();
@@ -37,7 +41,8 @@ export default function SystemSettingsPage() {
     currentYear: '2026',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    logoUrl: ''
   });
 
   useEffect(() => {
@@ -49,7 +54,8 @@ export default function SystemSettingsPage() {
         currentYear: schoolSettings.currentYear || '2026',
         email: schoolSettings.email || '',
         phone: schoolSettings.phone || '',
-        address: schoolSettings.address || ''
+        address: schoolSettings.address || '',
+        logoUrl: schoolSettings.logoUrl || ''
       });
     }
   }, [schoolSettings]);
@@ -66,6 +72,17 @@ export default function SystemSettingsPage() {
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, logoUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -97,9 +114,9 @@ export default function SystemSettingsPage() {
       <Tabs defaultValue="institution" className="w-full">
         <TabsList className="bg-white border border-gray-100 p-1 rounded-xl shadow-sm h-auto gap-1 mb-6">
           <TabsTrigger value="institution" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Institution Profile</TabsTrigger>
+          <TabsTrigger value="branding" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Branding</TabsTrigger>
           <TabsTrigger value="academic" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Academic Sessions</TabsTrigger>
           <TabsTrigger value="notifications" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Notifications</TabsTrigger>
-          <TabsTrigger value="security" className="px-4 py-2 text-xs rounded-lg data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Security & RBAC</TabsTrigger>
         </TabsList>
 
         <TabsContent value="institution" className="space-y-6">
@@ -161,8 +178,12 @@ export default function SystemSettingsPage() {
                 <CardTitle className="text-sm">Identity Preview</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center text-center p-6 space-y-4">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white text-3xl font-bold">
-                  {formData.shortName?.[0] || 'E'}
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white overflow-hidden">
+                  {formData.logoUrl ? (
+                    <img src={formData.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl font-bold">{formData.shortName?.[0] || 'E'}</span>
+                  )}
                 </div>
                 <div>
                   <p className="font-bold text-gray-800">{formData.schoolName || 'Institution Name'}</p>
@@ -175,6 +196,76 @@ export default function SystemSettingsPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="branding" className="space-y-6">
+          <Card className="border-gray-100 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm">Institutional Branding</CardTitle>
+              <CardDescription className="text-xs">Manage your school logo and visual identity.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2">
+                      <LinkIcon className="h-3 w-3" /> LOGO IMAGE URL
+                    </Label>
+                    <Input 
+                      placeholder="https://example.com/logo.png" 
+                      value={formData.logoUrl}
+                      onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
+                    />
+                    <p className="text-[10px] text-gray-400">Provide a direct link to an image (PNG, JPG, SVG).</p>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-gray-100"></span>
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-bold">
+                      <span className="bg-white px-2 text-gray-300">OR UPLOAD</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2">
+                      <Upload className="h-3 w-3" /> UPLOAD LOGO FILE
+                    </Label>
+                    <div className="flex items-center gap-3">
+                      <Input 
+                        type="file" 
+                        accept="image/*" 
+                        className="text-xs" 
+                        onChange={handleLogoUpload}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400">Upload a local file. Recommended size: 512x512px.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-center">
+                  {formData.logoUrl ? (
+                    <div className="space-y-4">
+                      <div className="w-32 h-32 rounded-2xl bg-white p-2 shadow-sm border border-gray-100 overflow-hidden mx-auto">
+                        <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setFormData(prev => ({...prev, logoUrl: ''}))} className="text-red-500 hover:text-red-600 border-red-100 hover:bg-red-50 text-[10px] h-7">
+                        Remove Logo
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mx-auto shadow-sm">
+                        <ImageIcon className="h-8 w-8 text-gray-200" />
+                      </div>
+                      <p className="text-xs font-medium text-gray-400">No Logo Provided</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="academic">
@@ -223,10 +314,6 @@ export default function SystemSettingsPage() {
 
         <TabsContent value="notifications" className="p-12 text-center text-gray-400 italic text-xs">
           Notification templates and SMS gateway configuration...
-        </TabsContent>
-
-        <TabsContent value="security" className="p-12 text-center text-gray-400 italic text-xs">
-          Password policies and custom role definitions...
         </TabsContent>
       </Tabs>
     </div>

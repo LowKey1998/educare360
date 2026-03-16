@@ -202,6 +202,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const currentNav = isParent ? parentNav : adminNav;
   const schoolName = schoolSettings?.schoolName || 'Sunrise Academy';
+  const logoUrl = schoolSettings?.logoUrl;
 
   return (
     <div className="flex h-screen bg-[#F8F9FC] overflow-hidden">
@@ -212,8 +213,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-0 z-50 h-full w-64 bg-[#0F1A2E] flex flex-col border-r border-[#1E3A5F]/50 transition-transform duration-300 md:relative md:translate-x-0`}>
         <div className="p-4 border-b border-[#1E3A5F]/50">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">{(schoolSettings?.shortName || 'E')[0]}</span>
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-sm">{(schoolSettings?.shortName || 'E')[0]}</span>
+              )}
             </div>
             <div className="min-w-0">
               <h2 className="text-white font-semibold text-sm truncate">{schoolName}</h2>
@@ -321,7 +326,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-[11px] font-bold text-gray-800 leading-none">{profile.displayName || profile.email?.split('@')[0]}</p>
                 <p className="text-[9px] text-gray-400 mt-0.5 capitalize">{profile.role}</p>
               </div>
-              <UserCircle className="h-8 w-8 text-gray-200" />
+              <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <UserCircle className="h-6 w-6 text-gray-200" />
+                )}
+              </div>
             </div>
           </div>
         </header>
