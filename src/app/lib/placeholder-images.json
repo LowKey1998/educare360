@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-education",
+      "description": "Modern school building or classroom",
+      "imageUrl": "https://picsum.photos/seed/school1/1200/800",
+      "imageHint": "modern school"
+    },
+    {
+      "id": "feature-academic",
+      "description": "Students studying",
+      "imageUrl": "https://picsum.photos/seed/study/600/400",
+      "imageHint": "students studying"
+    }
+  ]
+}

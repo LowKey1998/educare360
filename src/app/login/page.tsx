@@ -1,29 +1,76 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { useAuth, useDatabase, useRTDBDoc } from '@/firebase';
-import { Mail, Lock, Eye, EyeOff, X, Loader2 } from 'lucide-react';
+import { ref, set, serverTimestamp, onValue } from 'firebase/database';
+import { useAuth, useUser, useDatabase, useRTDBDoc } from '@/firebase';
+import { Mail, Lock, Eye, EyeOff, Loader2, Sparkles, UserCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const auth = useAuth();
   const database = useDatabase();
+  const { user, loading: authLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'admin' | 'staff' | 'parent'>('parent');
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
   const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
   const schoolName = schoolSettings?.schoolName || 'EduCare360';
 
+  useEffect(() => {
+    if (user && !authLoading) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  // Check if an admin exists to allow/restrict admin signup
+  useEffect(() => {
+    if (!database) return;
+    const usersRef = ref(database, 'users');
+    const unsubscribe = onValue(usersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        setAdminExists(false);
+        setRole('admin'); 
+        return;
+      }
+      const hasAdmin = Object.values(data).some((u: any) => u.role === 'admin');
+      setAdminExists(hasAdmin);
+      
+      // Enforce roles: If admin exists, publics can only be parents.
+      // If no admin exists, first user MUST be admin.
+      if (hasAdmin) {
+        setRole('parent');
+      } else {
+        setRole('admin');
+      }
+    });
+    return () => unsubscribe();
+  }, [database]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) return;
+    if (mode === 'signup' && !name) {
+      toast({
+        title: "Name Required",
+        description: "Please enter your full name to create an account.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
       if (mode === 'signin') {
@@ -33,10 +80,20 @@ export default function LoginPage() {
           description: "Signing you into your dashboard...",
         });
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUser = userCredential.user;
+        
+        // Create user profile in RTDB
+        await set(ref(database, `users/${newUser.uid}`), {
+          email: newUser.email,
+          role: role,
+          createdAt: serverTimestamp(),
+          displayName: name
+        });
+
         toast({
           title: "Account created!",
-          description: `Welcome to the ${schoolName} platform.`,
+          description: `Welcome to ${schoolName}, ${name}. Registered as a ${role}.`,
         });
       }
       router.push('/dashboard');
@@ -51,46 +108,57 @@ export default function LoginPage() {
     }
   };
 
+  if (authLoading || (adminExists === null && database)) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-teal-600" />
+          <p className="text-sm text-gray-500 font-medium">Verifying Session...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center p-6 selection:bg-teal-500/30">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
-        {/* Header Section with Brand Gradient */}
-        <div className="bg-gradient-to-r from-[#1E3A5F] to-[#0D9488] p-6 text-white relative">
-          <button 
-            onClick={() => router.push('/')}
-            className="absolute top-4 right-4 p-1 rounded-lg hover:bg-white/20 transition-colors"
-            title="Close"
-          >
-            <X className="h-4.5 w-4.5" />
-          </button>
+    <div className="min-h-screen bg-[#F8F9FC] flex flex-col items-center justify-center p-6 selection:bg-teal-500/30 relative overflow-hidden">
+      <Link href="/" className="absolute top-8 left-8 flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-teal-600 transition-colors uppercase tracking-widest">
+        <ArrowLeft className="h-4 w-4" /> Back to Home
+      </Link>
+
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
+        <div className="bg-gradient-to-r from-[#1E3A5F] to-[#0D9488] p-8 text-white relative">
+          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+            <Sparkles className="h-32 w-32" />
+          </div>
           
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
+          <div className="flex items-center gap-3 mb-4 relative z-10">
+            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10 shadow-lg">
               {schoolSettings?.logoUrl ? (
                 <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-cover rounded-lg" />
               ) : (
-                <span className="text-white font-bold text-lg">{(schoolSettings?.shortName || 'E')[0]}</span>
+                <span className="text-white font-bold text-xl font-headline">{(schoolSettings?.shortName || 'E')[0]}</span>
               )}
             </div>
             <div>
-              <h2 className="text-lg font-bold">{schoolName}</h2>
-              <p className="text-xs text-white/70">School Management System</p>
+              <h2 className="text-xl font-bold font-headline tracking-tight">{schoolName}</h2>
+              <p className="text-xs text-white/70 uppercase tracking-widest font-bold">Secure Portal</p>
             </div>
           </div>
-          <p className="text-sm text-white/80">
-            {mode === 'signin' ? 'Sign in to access your dashboard' : 'Create your institution account'}
+          <p className="text-sm text-white/80 relative z-10 leading-relaxed">
+            {mode === 'signin' 
+              ? 'Institutional access for parents, staff, and administrators.' 
+              : 'Register your family account to track student progress.'}
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-100">
           <button 
             type="button"
             onClick={() => setMode('signin')}
-            className={`flex-1 py-3 text-xs font-semibold transition-all ${
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-all ${
               mode === 'signin' 
-                ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/30' 
-                : 'text-gray-400 hover:text-gray-600'
+                ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/10' 
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
             }`}
           >
             Sign In
@@ -98,35 +166,68 @@ export default function LoginPage() {
           <button 
             type="button"
             onClick={() => setMode('signup')}
-            className={`flex-1 py-3 text-xs font-semibold transition-all ${
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-all ${
               mode === 'signup' 
-                ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/30' 
-                : 'text-gray-400 hover:text-gray-600'
+                ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50/10' 
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
             }`}
           >
-            Create Account
+            Register
           </button>
         </div>
 
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1">Email Address</label>
+        <form onSubmit={handleSubmit} className="p-8 space-y-5">
+          {mode === 'signup' && (
+            <>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                <div className="relative group">
+                  <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-teal-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="John Doe" 
+                    required 
+                    className="w-full bg-white pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Account Role</label>
+                <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-teal-700 uppercase">{role}</span>
+                    <span className="text-[9px] text-teal-600/70 font-medium italic">Auto-assigned</span>
+                  </div>
+                  <p className="text-[10px] text-teal-600 mt-1 leading-relaxed">
+                    {role === 'admin' 
+                      ? 'Welcome, Founder. You are registering as the system owner.' 
+                      : 'Parents can link student records after registration.'}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email Address</label>
             <div className="relative group">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-teal-500 transition-colors" />
               <input 
                 type="email" 
-                placeholder="admin@sunrise.edu" 
+                placeholder="email@example.com" 
                 required 
-                className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
+                className="w-full bg-white pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1">Password</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Password</label>
             <div className="relative group">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-teal-500 transition-colors" />
               <input 
@@ -134,46 +235,37 @@ export default function LoginPage() {
                 placeholder="••••••••" 
                 required 
                 minLength={6}
-                className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
+                className="w-full bg-white pl-10 pr-10 py-3 text-sm border border-gray-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all placeholder:text-gray-300"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
               <button 
                 type="button" 
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-md transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition-colors"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
-          {mode === 'signin' && (
-            <div className="flex justify-end">
-              <button type="button" className="text-[11px] font-semibold text-teal-600 hover:underline">
-                Forgot Password?
-              </button>
-            </div>
-          )}
-
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-[#1E3A5F] to-[#0D9488] text-white text-sm font-bold rounded-lg hover:shadow-lg hover:shadow-teal-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3.5 bg-gradient-to-r from-[#1E3A5F] to-[#0D9488] text-white text-sm font-bold rounded-xl hover:shadow-xl hover:shadow-teal-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 mt-4"
           >
             {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Processing...
-              </>
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              mode === 'signin' ? 'Sign In' : 'Create Account'
+              mode === 'signin' ? 'Access Dashboard' : 'Create Account'
             )}
           </button>
 
-          <div className="pt-2">
-            <p className="text-center text-[11px] text-gray-400 italic">
-              Demo: You can use any email to explore the system.
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-center text-[10px] text-gray-400 italic leading-relaxed">
+              {mode === 'signup' && adminExists 
+                ? 'Contact admin for Staff or Teacher account creation.' 
+                : 'Protected by enterprise-grade institutional encryption.'}
             </p>
           </div>
         </form>
