@@ -14,7 +14,8 @@ import {
   Database,
   ShieldCheck,
   UserCheck,
-  UserCog
+  UserCog,
+  TrendingUp
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
 import { 
@@ -60,10 +61,16 @@ export default function HRPage() {
   }, [staffList, search]);
 
   const stats = useMemo(() => {
+    const now = Date.now();
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+    const newStaff = staffList.filter(s => (s.createdAt || 0) > thirtyDaysAgo).length;
+    const trend = staffList.length > 0 ? `+${((newStaff / staffList.length) * 100).toFixed(1)}%` : '0%';
+
     return {
       total: staffList.length,
       teachers: staffList.filter(s => s.role === 'staff').length,
       admins: staffList.filter(s => s.role === 'admin').length,
+      trend
     };
   }, [staffList]);
 
@@ -108,27 +115,27 @@ export default function HRPage() {
           </div>
           <div>
             <h2 className="text-xl font-bold">HR & Staff Management</h2>
-            <p className="text-sm text-white/80 mt-1">Manage institutional human resources, teaching staff and payroll access</p>
+            <p className="text-sm text-white/80 mt-1">Institutional workforce, teacher registry and payroll access</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden md:flex px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
-              <ShieldCheck className="w-3.5 h-3.5" /> RBAC Verified
+              <ShieldCheck className="w-3.5 h-3.5" /> RBAC Active
             </div>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<Users className="w-4 h-4 text-blue-600" />} label="Total Workforce" value={loading ? '...' : stats.total.toString()} color="bg-blue-50" />
-        <StatCard icon={<UserCheck className="w-4 h-4 text-teal-600" />} label="Teaching Staff" value={loading ? '...' : stats.teachers.toString()} color="bg-teal-50" />
-        <StatCard icon={<UserCog className="w-4 h-4 text-purple-600" />} label="Administrators" value={loading ? '...' : stats.admins.toString()} color="bg-purple-50" />
-        <StatCard icon={<Calendar className="w-4 h-4 text-amber-600" />} label="Active Sessions" value="Term 1" color="bg-amber-50" />
+        <StatCard icon={<Users className="w-4 h-4 text-blue-600" />} label="Total Workforce" value={loading ? '...' : stats.total.toString()} trend={stats.trend} color="bg-blue-50" />
+        <StatCard icon={<UserCheck className="w-4 h-4 text-teal-600" />} label="Teaching Staff" value={loading ? '...' : stats.teachers.toString()} trend="Certified" color="bg-teal-50" />
+        <StatCard icon={<UserCog className="w-4 h-4 text-purple-600" />} label="Administrators" value={loading ? '...' : stats.admins.toString()} trend="Global" color="bg-purple-50" />
+        <StatCard icon={<Calendar className="w-4 h-4 text-amber-600" />} label="Shift Status" value="Normal" trend="All In" color="bg-amber-50" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col sm:flex-row gap-3 items-center justify-between shadow-sm">
         <div className="relative flex-1 w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-          <Input className="pl-9 text-xs h-10" placeholder="Search staff..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9 text-xs h-10" placeholder="Search directory..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
@@ -168,7 +175,7 @@ export default function HRPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? <div className="p-20 text-center col-span-full">Syncing...</div> : filteredStaff.map((staff) => (
           <div key={staff.id} className="border border-gray-100 rounded-xl p-4 hover:shadow-md transition-all group relative bg-white">
-            <button onClick={() => handleDelete(staff.id)} className="absolute top-3 right-3 p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+            <button onClick={() => handleDelete(staff.id)} className="absolute top-3 right-3 p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-600 transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
                 {staff.displayName?.[0] || '?'}
@@ -189,12 +196,16 @@ export default function HRPage() {
   );
 }
 
-function StatCard({ icon, label, value, color }: any) {
+function StatCard({ icon, label, value, trend, color }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all group">
       <div className="flex items-center justify-between mb-3">
         <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${color} text-gray-700`}>{label}</span>
-        <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center group-hover:scale-110 shadow-sm`}>{icon}</div>
+        {trend && (
+          <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
+            <TrendingUp className="w-3 h-3" /> {trend}
+          </span>
+        )}
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
     </div>

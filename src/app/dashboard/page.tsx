@@ -4,13 +4,10 @@
 import { useMemo } from 'react';
 import { 
   Users, 
-  Baby, 
-  GraduationCap, 
   DollarSign, 
   ClipboardCheck, 
   Briefcase,
   TrendingUp,
-  TrendingDown,
   UserPlus,
   MessageSquare,
   FileText,
@@ -23,21 +20,6 @@ import {
   Award,
   ArrowRight
 } from 'lucide-react';
-import { 
-  Area, 
-  AreaChart, 
-  ResponsiveContainer, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend,
-  Bar,
-  BarChart,
-  Pie,
-  PieChart,
-  Cell
-} from 'recharts';
 import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import Link from 'next/link';
 
@@ -45,44 +27,57 @@ export default function DashboardPage() {
   const database = useDatabase();
   const { profile, loading: profileLoading } = useUserProfile();
   
-  // Real-time data streams
   const { data: students, loading: studentsLoading } = useRTDBCollection(database, 'students');
   const { data: admissions, loading: admissionsLoading } = useRTDBCollection(database, 'admissions');
   const { data: users, loading: usersLoading } = useRTDBCollection(database, 'users');
   const { data: announcements, loading: announcementsLoading } = useRTDBCollection(database, 'announcements');
+  const { data: transactions } = useRTDBCollection(database, 'transactions');
 
   const loading = studentsLoading || admissionsLoading || usersLoading || profileLoading || announcementsLoading;
 
-  // Role Checks
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const isParent = profile?.role === 'parent';
 
-  // Parent Specific Logic
   const myChildren = useMemo(() => {
     if (!isParent || !profile?.email) return [];
     return students.filter(s => s.parentEmail?.toLowerCase() === profile.email?.toLowerCase());
   }, [students, profile?.email, isParent]);
 
-  // Admin Memoized Metrics
-  const adminStats = useMemo(() => {
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+
+    // Enrolment Trends
     const totalEnrolment = students.length;
+    const newEnrolments = students.filter(s => (s.createdAt || 0) > thirtyDaysAgo).length;
+    const enrolmentTrend = totalEnrolment > 0 ? `+${((newEnrolments / totalEnrolment) * 100).toFixed(1)}%` : '0%';
+
+    // Revenue Trends
+    const totalPaid = (transactions || []).reduce((acc, tx) => acc + (tx.amount || 0), 0);
+    const recentPaid = (transactions || []).filter(tx => (tx.timestamp || 0) > sevenDaysAgo).reduce((acc, tx) => acc + (tx.amount || 0), 0);
+    const revenueTrend = totalPaid > 0 ? `+${((recentPaid / totalPaid) * 100).toFixed(1)}%` : '0%';
+
+    // Staff Trends
     const staffCount = users.filter(u => u.role === 'admin' || u.role === 'staff').length;
-    const totalRevenue = students.reduce((acc, s) => acc + (parseFloat(s.feeBalance) || 0), 0);
+    
+    // Attendance
     const avgAttendance = students.length > 0 
       ? students.reduce((acc, s) => acc + (parseFloat(s.attendanceRate) || 0), 0) / students.length 
       : 0;
 
     return {
       totalEnrolment,
+      enrolmentTrend,
+      revenue: totalPaid.toLocaleString(),
+      revenueTrend,
       staffCount,
-      revenue: totalRevenue.toLocaleString(),
       newApps: admissions.filter(a => a.status === 'New').length,
       attendance: avgAttendance.toFixed(1),
       events: announcements.length
     };
-  }, [students, admissions, users, announcements]);
+  }, [students, admissions, users, announcements, transactions]);
 
-  // Parent Memoized Metrics
   const parentStats = useMemo(() => {
     const totalArrears = myChildren.reduce((acc, s) => acc + (parseFloat(s.feeBalance) || 0), 0);
     const avgAttendance = myChildren.length > 0 
@@ -104,7 +99,6 @@ export default function DashboardPage() {
     );
   }
 
-  // --- PARENT DASHBOARD VIEW ---
   if (isParent) {
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
@@ -206,7 +200,6 @@ export default function DashboardPage() {
     );
   }
 
-  // --- ADMIN DASHBOARD VIEW ---
   return (
     <div className="space-y-5 animate-in fade-in duration-500">
       <div className="bg-gradient-to-r from-[#1E3A5F] via-[#1E3A5F] to-[#0D9488] rounded-xl p-6 text-white relative overflow-hidden">
@@ -214,21 +207,21 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold">Good Day, {profile?.displayName || 'Admin'}</h2>
           <p className="text-sm text-white/70 mt-1">Institutional Overview for {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}.</p>
           <div className="flex flex-wrap gap-3 mt-4">
-            <HeroMetric label="Global Enrollment" value={adminStats.totalEnrolment.toString()} />
-            <HeroMetric label="Total Arrears" value={`$${adminStats.revenue}`} />
-            <HeroMetric label="New Apps" value={adminStats.newApps.toString()} />
-            <HeroMetric label="Workforce" value={adminStats.staffCount.toString()} />
+            <HeroMetric label="Global Enrollment" value={stats.totalEnrolment.toString()} />
+            <HeroMetric label="Revenue To Date" value={`$${stats.revenue}`} />
+            <HeroMetric label="New Apps" value={stats.newApps.toString()} />
+            <HeroMetric label="Workforce" value={stats.staffCount.toString()} />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard title="Enrolment" value={adminStats.totalEnrolment.toString()} trend="+12%" isPositive={true} icon={<Users className="w-5 h-5" />} color="bg-blue-50 text-blue-600" />
-        <StatCard title="Revenue" value={`$${adminStats.revenue}`} trend="+22%" isPositive={true} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
-        <StatCard title="Attendance" value={`${adminStats.attendance}%`} trend="Live" isPositive={true} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
-        <StatCard title="Staff" value={adminStats.staffCount.toString()} trend="+4" isPositive={true} icon={<Briefcase className="w-5 h-5" />} color="bg-rose-50 text-rose-600" />
-        <StatCard title="Applications" value={adminStats.newApps.toString()} trend="Live" isPositive={true} icon={<UserPlus className="w-5 h-5" />} color="bg-indigo-50 text-indigo-600" />
-        <StatCard title="Events" value={adminStats.events.toString()} trend="Announcements" isPositive={true} icon={<Calendar className="w-5 h-5" />} color="bg-teal-50 text-teal-600" />
+        <StatCard title="Enrolment" value={stats.totalEnrolment.toString()} trend={stats.enrolmentTrend} isPositive={true} icon={<Users className="w-5 h-5" />} color="bg-blue-50 text-blue-600" />
+        <StatCard title="Revenue" value={`$${stats.revenue}`} trend={stats.revenueTrend} isPositive={true} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
+        <StatCard title="Attendance" value={`${stats.attendance}%`} trend="Live" isPositive={true} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
+        <StatCard title="Staff" value={stats.staffCount.toString()} trend="Active" isPositive={true} icon={<Briefcase className="w-5 h-5" />} color="bg-rose-50 text-rose-600" />
+        <StatCard title="Applications" value={stats.newApps.toString()} trend="Pending" isPositive={true} icon={<UserPlus className="w-5 h-5" />} color="bg-indigo-50 text-indigo-600" />
+        <StatCard title="Total Events" value={stats.events.toString()} trend="Announcements" isPositive={true} icon={<Calendar className="w-5 h-5" />} color="bg-teal-50 text-teal-600" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-5">
@@ -248,14 +241,14 @@ export default function DashboardPage() {
           <h3 className="text-sm font-semibold text-gray-800 mb-4">Institutional Activity</h3>
           <div className="space-y-3">
             <ActivityItem icon={<CircleCheck className="h-3.5 w-3.5" />} color="text-green-500" text="System settings updated by administrator" time="Just now" />
-            <ActivityItem icon={<Clock className="h-3.5 w-3.5" />} color="text-blue-500" text={`Registry check: ${adminStats.totalEnrolment} pupils active`} time="1 hr ago" />
+            <ActivityItem icon={<Clock className="h-3.5 w-3.5" />} color="text-blue-500" text={`Registry check: ${stats.totalEnrolment} pupils active`} time="1 hr ago" />
             <ActivityItem icon={<TriangleAlert className="h-3.5 w-3.5" />} color="text-amber-500" text="Fee statement generation job started" time="2 hrs ago" />
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col items-center justify-center text-center">
           <TrendingUp className="w-12 h-12 text-teal-100 mb-2" />
           <p className="text-sm font-bold text-gray-800">Growth Analysis</p>
-          <p className="text-xs text-gray-500 max-w-xs mt-1">Enrollment is up 12.5% YoY. View the Analytics section for detailed reporting.</p>
+          <p className="text-xs text-gray-500 max-w-xs mt-1">Enrollment is trending at {stats.enrolmentTrend} based on recent records. View Analytics for full reporting.</p>
         </div>
       </div>
     </div>

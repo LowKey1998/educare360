@@ -65,18 +65,19 @@ export default function AdmissionsPage() {
     );
   }, [applications, search]);
 
-  const groupedApps = useMemo(() => {
+  const stats = useMemo(() => {
     const groups: Record<string, Admission[]> = {};
     STATUS_LABELS.forEach(label => groups[label] = []);
     filteredApps.forEach(app => {
       const status = app.status || 'New';
-      if (groups[status]) {
-        groups[status].push(app);
-      } else {
-        groups['New'].push(app);
-      }
+      if (groups[status]) groups[status].push(app);
     });
-    return groups;
+
+    const total = filteredApps.length;
+    const accepted = groups['Accepted'].length;
+    const rate = total > 0 ? ((accepted / total) * 100).toFixed(1) : '0.0';
+
+    return { groups, rate };
   }, [filteredApps]);
 
   const handleAddApp = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -126,12 +127,6 @@ export default function AdmissionsPage() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <svg viewBox="0 0 400 200" className="w-full h-full">
-            <circle cx="350" cy="30" r="80" fill="white" />
-            <circle cx="100" cy="180" r="120" fill="white" />
-          </svg>
-        </div>
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
             <UserPlus className="w-7 h-7" />
@@ -149,10 +144,10 @@ export default function AdmissionsPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <AdmissionStat label="New Applications" value={loading ? '...' : groupedApps['New']?.length.toString()} icon={<Mail className="h-4 w-4" />} color="bg-blue-50 text-blue-600" />
-        <AdmissionStat label="Interviews" value={loading ? '...' : groupedApps['Interview']?.length.toString()} icon={<ClipboardList className="h-4 w-4" />} color="bg-purple-50 text-purple-600" />
-        <AdmissionStat label="Waitlisted" value={loading ? '...' : groupedApps['Waitlisted']?.length.toString()} icon={<Clock className="h-4 w-4" />} color="bg-gray-50 text-gray-600" />
-        <AdmissionStat label="Acceptance Rate" value="64%" icon={<ArrowUpRight className="h-4 w-4" />} color="bg-green-50 text-green-600" />
+        <AdmissionStat label="New Applications" value={loading ? '...' : stats.groups['New']?.length.toString()} icon={<Mail className="h-4 w-4" />} color="bg-blue-50 text-blue-600" />
+        <AdmissionStat label="Interviews" value={loading ? '...' : stats.groups['Interview']?.length.toString()} icon={<ClipboardList className="h-4 w-4" />} color="bg-purple-50 text-purple-600" />
+        <AdmissionStat label="Waitlisted" value={loading ? '...' : stats.groups['Waitlisted']?.length.toString()} icon={<Clock className="h-4 w-4" />} color="bg-gray-50 text-gray-600" />
+        <AdmissionStat label="Acceptance Rate" value={`${stats.rate}%`} icon={<ArrowUpRight className="h-4 w-4" />} color="bg-green-50 text-green-600" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col sm:flex-row gap-3 items-center justify-between shadow-sm">
@@ -173,9 +168,7 @@ export default function AdmissionsPage() {
           </DialogTrigger>
           <DialogContent>
             <form onSubmit={handleAddApp}>
-              <DialogHeader>
-                <DialogTitle>Register New Application</DialogTitle>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Register New Application</DialogTitle></DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Student Full Name</Label>
@@ -185,11 +178,9 @@ export default function AdmissionsPage() {
                   <div className="space-y-2">
                     <Label>Grade Applied For</Label>
                     <Select name="grade" defaultValue="Grade 1">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
+                        {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
                           <SelectItem key={g} value={g}>{g}</SelectItem>
                         ))}
                       </SelectContent>
@@ -202,7 +193,7 @@ export default function AdmissionsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" name="docs" id="docs" className="rounded border-gray-300" />
-                  <Label htmlFor="docs" className="text-xs">Documentation Pending (Birth cert, etc.)</Label>
+                  <Label htmlFor="docs" className="text-xs">Documentation Pending</Label>
                 </div>
               </div>
               <DialogFooter>
@@ -215,7 +206,7 @@ export default function AdmissionsPage() {
         </Dialog>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar h-[calc(100vh-450px)] min-h-[400px]">
+      <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar">
         {STATUS_LABELS.map(label => (
           <div key={label} className="bg-gray-50/50 rounded-xl p-3 min-w-[280px] w-[280px] h-fit border border-gray-100">
             <div className="flex items-center justify-between mb-4 px-1">
@@ -224,13 +215,13 @@ export default function AdmissionsPage() {
                 <span className="text-[11px] font-bold text-gray-700 uppercase tracking-tight">{label}</span>
               </div>
               <span className="text-[10px] font-bold text-gray-400 bg-white px-1.5 py-0.5 rounded border border-gray-100">
-                {loading ? '...' : groupedApps[label]?.length || 0}
+                {loading ? '...' : stats.groups[label]?.length || 0}
               </span>
             </div>
             
             <div className="space-y-2.5">
-              {groupedApps[label]?.map((app) => (
-                <div key={app.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group relative cursor-default">
+              {stats.groups[label]?.map((app) => (
+                <div key={app.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm hover:shadow-md transition-all group relative">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-mono text-gray-400">{app.applicationId}</p>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -244,28 +235,17 @@ export default function AdmissionsPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <button onClick={() => handleDelete(app.id)} className="text-gray-300 hover:text-red-500 transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <button onClick={() => handleDelete(app.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
                   <p className="text-xs font-bold text-gray-800 mb-1">{app.studentName}</p>
                   <p className="text-[10px] text-gray-500 font-medium">{app.grade} • Age {app.age}</p>
-                  
                   <div className="mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-between">
                     <span className="text-[9px] text-gray-400 font-bold uppercase">{app.submissionDate}</span>
-                    {app.docsPending && (
-                      <span className="text-[9px] text-rose-500 font-bold bg-rose-50 px-1.5 py-0.5 rounded">PENDING DOCS</span>
-                    )}
+                    {app.docsPending && <span className="text-[9px] text-rose-500 font-bold bg-rose-50 px-1.5 py-0.5 rounded">PENDING DOCS</span>}
                   </div>
                 </div>
               ))}
-              
-              {!loading && groupedApps[label]?.length === 0 && (
-                <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-xl">
-                  <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">No Records</p>
-                </div>
-              )}
             </div>
           </div>
         ))}
