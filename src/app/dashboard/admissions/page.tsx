@@ -8,7 +8,6 @@ import {
   Plus, 
   Search, 
   MoreHorizontal, 
-  Loader2,
   Database,
   Trash2,
   UserPlus,
@@ -18,7 +17,6 @@ import {
   Clock
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, push, remove, serverTimestamp, update } from 'firebase/database';
 import { 
   Dialog, 
   DialogContent, 
@@ -36,6 +34,8 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { admissionService } from '@/services/admissions';
+import { Admission } from '@/lib/types';
 
 const STATUS_CONFIG: Record<string, { color: string, dot: string, bg: string }> = {
   'New': { color: 'text-blue-700', dot: 'bg-blue-500', bg: 'bg-blue-50' },
@@ -55,7 +55,7 @@ export default function AdmissionsPage() {
   
   const database = useDatabase();
   const { toast } = useToast();
-  const { data: applications, loading } = useRTDBCollection(database, 'admissions');
+  const { data: applications, loading } = useRTDBCollection<Admission>(database, 'admissions');
 
   const filteredApps = useMemo(() => {
     if (!applications) return [];
@@ -66,7 +66,7 @@ export default function AdmissionsPage() {
   }, [applications, search]);
 
   const groupedApps = useMemo(() => {
-    const groups: Record<string, any[]> = {};
+    const groups: Record<string, Admission[]> = {};
     STATUS_LABELS.forEach(label => groups[label] = []);
     filteredApps.forEach(app => {
       const status = app.status || 'New';
@@ -83,19 +83,18 @@ export default function AdmissionsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    const data = {
-      studentName: formData.get('name'),
-      grade: formData.get('grade'),
+    const data: Omit<Admission, 'id' | 'createdAt'> = {
+      studentName: formData.get('name') as string,
+      grade: formData.get('grade') as string,
       age: parseInt(formData.get('age') as string),
       status: 'New',
       applicationId: `APP-${Math.floor(1000 + Math.random() * 9000)}`,
       submissionDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-      docsPending: formData.get('docs') === 'on',
-      createdAt: serverTimestamp()
+      docsPending: formData.get('docs') === 'on'
     };
 
     try {
-      await push(ref(database, 'admissions'), data);
+      await admissionService.addApplication(database, data);
       setIsAddOpen(false);
       toast({ title: "Application Received", description: `Submitted for ${data.studentName}.` });
     } catch (e) {
@@ -107,7 +106,7 @@ export default function AdmissionsPage() {
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
-      await update(ref(database, `admissions/${id}`), { status: newStatus });
+      await admissionService.updateStatus(database, id, newStatus);
       toast({ title: "Status Updated", description: `Application is now ${newStatus}.` });
     } catch (e) {
       toast({ title: "Error", description: "Update failed." });
@@ -116,13 +115,16 @@ export default function AdmissionsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this application?')) return;
-    await remove(ref(database, `admissions/${id}`));
-    toast({ title: "Application Removed", description: "The record was deleted." });
+    try {
+      await admissionService.deleteApplication(database, id);
+      toast({ title: "Application Removed", description: "The record was deleted." });
+    } catch (e) {
+      toast({ title: "Error", description: "Deletion failed." });
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <svg viewBox="0 0 400 200" className="w-full h-full">
@@ -227,7 +229,7 @@ export default function AdmissionsPage() {
             </div>
             
             <div className="space-y-2.5">
-              {groupedApps[label]?.map((app: any) => (
+              {groupedApps[label]?.map((app) => (
                 <div key={app.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group relative cursor-default">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-mono text-gray-400">{app.applicationId}</p>

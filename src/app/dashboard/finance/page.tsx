@@ -7,7 +7,6 @@ import {
   Database, 
   DollarSign, 
   TrendingUp, 
-  TrendingDown, 
   Loader2,
   Users,
   CreditCard,
@@ -18,22 +17,16 @@ import {
   Activity
 } from 'lucide-react';
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  Legend
+  Legend,
+  Tooltip,
+  ResponsiveContainer
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, update, serverTimestamp, push } from 'firebase/database';
 import { 
   Dialog, 
   DialogContent, 
@@ -52,6 +45,8 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { financeService } from '@/services/finance';
+import { Student, Transaction } from '@/lib/types';
 
 const COLORS = ['#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
 
@@ -59,8 +54,8 @@ export default function FinanceBillingPage() {
   const database = useDatabase();
   const { toast } = useToast();
   
-  const { data: students, loading: studentsLoading } = useRTDBCollection(database, 'students');
-  const { data: transactions, loading: txLoading } = useRTDBCollection(database, 'transactions');
+  const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
+  const { data: transactions, loading: txLoading } = useRTDBCollection<Transaction>(database, 'transactions');
   
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,26 +64,25 @@ export default function FinanceBillingPage() {
   const loading = studentsLoading || txLoading;
 
   const stats = useMemo(() => {
-    if (loading) return null;
+    if (loading || !students || !transactions) return null;
 
-    const totalPaid = transactions.reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
-    const totalArrears = students.reduce((acc, s) => acc + (parseFloat(s.feeBalance) || 0), 0);
+    const totalPaid = transactions.reduce((acc, tx) => acc + (tx.amount || 0), 0);
+    const totalArrears = students.reduce((acc, s) => acc + (s.feeBalance || 0), 0);
     const totalBilled = totalPaid + totalArrears;
-    const debtorCount = students.filter(s => (parseFloat(s.feeBalance) || 0) > 0).length;
+    const debtorCount = students.filter(s => (s.feeBalance || 0) > 0).length;
     const collectionRate = totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 0;
 
-    // Calculate trends based on timestamps
     const now = Date.now();
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
     const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
 
     const currentWeekPaid = transactions
-      .filter(tx => tx.timestamp > weekAgo)
-      .reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
+      .filter(tx => (tx.timestamp as number) > weekAgo)
+      .reduce((acc, tx) => acc + (tx.amount || 0), 0);
     
     const lastWeekPaid = transactions
-      .filter(tx => tx.timestamp > twoWeeksAgo && tx.timestamp <= weekAgo)
-      .reduce((acc, tx) => acc + (parseFloat(tx.amount) || 0), 0);
+      .filter(tx => (tx.timestamp as number) > twoWeeksAgo && (tx.timestamp as number) <= weekAgo)
+      .reduce((acc, tx) => acc + (tx.amount || 0), 0);
 
     const growth = lastWeekPaid > 0 
       ? ((currentWeekPaid - lastWeekPaid) / lastWeekPaid) * 100 
@@ -105,11 +99,11 @@ export default function FinanceBillingPage() {
   }, [students, transactions, loading]);
 
   const paymentMethodsData = useMemo(() => {
-    if (loading) return [];
+    if (loading || !transactions) return [];
     const counts: Record<string, number> = {};
     transactions.forEach(tx => {
       const method = tx.method || 'Other';
-      counts[method] = (counts[method] || 0) + (parseFloat(tx.amount) || 0);
+      counts[method] = (counts[method] || 0) + (tx.amount || 0);
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [transactions, loading]);
@@ -120,29 +114,22 @@ export default function FinanceBillingPage() {
     const formData = new FormData(e.currentTarget);
     const studentId = formData.get('studentId') as string;
     const amount = parseFloat(formData.get('amount') as string);
+    const method = formData.get('method') as string;
 
     const student = students.find(s => s.id === studentId);
     if (!student) return;
 
     try {
-      const currentBalance = parseFloat(student.feeBalance) || 0;
-      const newBalance = Math.max(0, currentBalance - amount);
-      
-      await update(ref(database, `students/${studentId}`), {
-        feeBalance: newBalance
-      });
-
-      await push(ref(database, 'transactions'), {
-        studentId,
-        studentName: student.studentName,
-        amount,
-        method: formData.get('method'),
-        type: 'Fee Payment',
-        timestamp: serverTimestamp()
-      });
-
+      await financeService.recordPayment(
+        database, 
+        studentId, 
+        student.studentName, 
+        student.feeBalance, 
+        amount, 
+        method
+      );
       setIsPayOpen(false);
-      toast({ title: "Payment Recorded", description: `Updated balance for ${student.studentName}: $${newBalance.toFixed(2)}` });
+      toast({ title: "Payment Recorded", description: `Updated balance for ${student.studentName}` });
     } catch (e) {
       toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
     } finally {
@@ -152,7 +139,6 @@ export default function FinanceBillingPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <svg viewBox="0 0 400 200" className="w-full h-full">
@@ -176,7 +162,6 @@ export default function FinanceBillingPage() {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <FinanceMetricCard 
           label="Total Billed" 
@@ -213,7 +198,6 @@ export default function FinanceBillingPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Payment Entry Card */}
         <Card className="lg:col-span-2 border-gray-100 shadow-sm overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-50 mb-4">
             <div>
@@ -304,7 +288,7 @@ export default function FinanceBillingPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {students.filter(s => s.studentName?.toLowerCase().includes(search.toLowerCase())).map((student) => {
-                      const balance = parseFloat(student.feeBalance) || 0;
+                      const balance = student.feeBalance || 0;
                       return (
                         <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3 font-bold text-gray-800">{student.studentName}</td>
@@ -327,7 +311,6 @@ export default function FinanceBillingPage() {
           </CardContent>
         </Card>
 
-        {/* Financial Mix */}
         <div className="space-y-6">
           <Card className="border-gray-100 shadow-sm">
             <CardHeader className="pb-2">
