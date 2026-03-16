@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Download, 
   Plus, 
@@ -13,9 +13,10 @@ import {
   X, 
   Database,
   Loader2,
-  Clock
+  Clock,
+  Baby
 } from 'lucide-react';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
@@ -49,21 +50,51 @@ const PERIODS = [
   { label: 'Period 5', time: '10:40 - 11:20' },
 ];
 
+const DEFAULT_GRADES = ['Grade 1A', 'Grade 1B', 'Grade 2A', 'Grade 2B', 'Grade 3A', 'Grade 3B', 'Grade 4A', 'Grade 4B', 'Grade 5A', 'Grade 5B', 'Grade 6A', 'Grade 6B', 'Grade 7A', 'Grade 7B'];
+
 export default function TimetableCalendarPage() {
   const [activeTab, setActiveTab] = useState('timetable');
-  const [activeGrade, setActiveGrade] = useState('Grade 1A');
+  const [activeGrade, setActiveGrade] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const database = useDatabase();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
+  
   const { data: timetable, loading } = useRTDBCollection(database, 'timetable');
+  const { data: students } = useRTDBCollection(database, 'students');
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
+  const isParent = profile?.role === 'parent';
+
+  // Filter students linked to parent
+  const myChildren = useMemo(() => {
+    if (!isParent || !profile?.email) return [];
+    return students.filter(s => s.parentEmail?.toLowerCase() === profile.email?.toLowerCase());
+  }, [students, profile?.email, isParent]);
+
+  // Determine which grades should be available in the selector
+  const availableGrades = useMemo(() => {
+    if (isAdmin) return DEFAULT_GRADES;
+    // For parents, collect grades of their children
+    const childGrades = Array.from(new Set(myChildren.map(c => c.grade)));
+    return childGrades.length > 0 ? childGrades : [];
+  }, [isAdmin, myChildren]);
+
+  // Auto-select first available grade for parent
+  useEffect(() => {
+    if (!activeGrade && availableGrades.length > 0) {
+      setActiveGrade(availableGrades[0]);
+    }
+  }, [availableGrades, activeGrade]);
 
   const filteredLessons = useMemo(() => {
     return timetable.filter((l: any) => l.grade === activeGrade);
   }, [timetable, activeGrade]);
 
   const handleAddLesson = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (!isAdmin) return;
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
@@ -89,6 +120,7 @@ export default function TimetableCalendarPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!isAdmin) return;
     if (!confirm('Cancel this lesson?')) return;
     try {
       await remove(ref(database, `timetable/${id}`));
@@ -97,6 +129,18 @@ export default function TimetableCalendarPage() {
       toast({ title: "Error", description: "Delete failed." });
     }
   };
+
+  if (isParent && myChildren.length === 0 && !loading) {
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+          <CalendarIcon className="w-8 h-8" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-800">No Timetable Linked</h2>
+        <p className="text-xs text-gray-500">We couldn't find any students associated with your account to show a timetable.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -113,8 +157,10 @@ export default function TimetableCalendarPage() {
             <CalendarIcon className="w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Timetable & Academic Calendar</h2>
-            <p className="text-sm text-white/80 mt-1">Class schedules, exam slots, and institutional events</p>
+            <h2 className="text-xl font-bold">{isParent ? 'Student Timetable' : 'Timetable & Academic Calendar'}</h2>
+            <p className="text-sm text-white/80 mt-1">
+              {isParent ? 'View weekly lesson schedules for your family' : 'Class schedules, exam slots, and institutional events'}
+            </p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-3">
             <div className="px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
@@ -124,12 +170,14 @@ export default function TimetableCalendarPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<BookOpen className="w-4 h-4 text-violet-600" />} label="Lessons Logged" value={loading ? '...' : timetable.length.toString()} color="bg-violet-50" />
-        <StatCard icon={<FileText className="w-4 h-4 text-red-600" />} label="Upcoming Exams" value="10" color="bg-red-50" />
-        <StatCard icon={<CalendarIcon className="w-4 h-4 text-blue-600" />} label="Session Phase" value="Term 1" color="bg-blue-50" />
-        <StatCard icon={<Users className="w-4 h-4 text-teal-600" />} label="Classes Configured" value="14" color="bg-teal-50" />
-      </div>
+      {!isParent && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={<BookOpen className="w-4 h-4 text-violet-600" />} label="Lessons Logged" value={loading ? '...' : timetable.length.toString()} color="bg-violet-50" />
+          <StatCard icon={<FileText className="w-4 h-4 text-red-600" />} label="Upcoming Exams" value="10" color="bg-red-50" />
+          <StatCard icon={<CalendarIcon className="w-4 h-4 text-blue-600" />} label="Session Phase" value="Term 1" color="bg-blue-50" />
+          <StatCard icon={<Users className="w-4 h-4 text-teal-600" />} label="Classes Configured" value="14" color="bg-teal-50" />
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         <div className="flex border-b border-gray-100 px-4 overflow-x-auto custom-scrollbar">
@@ -143,78 +191,86 @@ export default function TimetableCalendarPage() {
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <Select value={activeGrade} onValueChange={setActiveGrade}>
-                  <SelectTrigger className="w-[160px] h-9 text-xs font-bold bg-white">
-                    <SelectValue />
+                  <SelectTrigger className="w-[180px] h-9 text-xs font-bold bg-white">
+                    <div className="flex items-center gap-2">
+                      {isParent ? <Baby className="w-3 h-3 text-rose-500" /> : <Users className="w-3 h-3 text-blue-500" />}
+                      <SelectValue placeholder="Select Class" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
-                    {['Grade 1A', 'Grade 1B', 'Grade 2A', 'Grade 2B', 'Grade 3A', 'Grade 3B', 'Grade 4A', 'Grade 4B', 'Grade 5A', 'Grade 5B', 'Grade 6A', 'Grade 6B', 'Grade 7A', 'Grade 7B'].map(grade => (
+                    {availableGrades.map(grade => (
                       <SelectItem key={grade} value={grade}>{grade}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest hidden lg:block">Drafting Terminal Schedule</span>
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest hidden lg:block">
+                  {isParent ? 'Showing child class schedule' : 'Drafting Terminal Schedule'}
+                </span>
               </div>
-              <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-9 text-xs font-bold gap-1.5 shadow-sm">
-                    <Plus className="h-3.5 w-3.5" /> Add Lesson
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <form onSubmit={handleAddLesson}>
-                    <DialogHeader>
-                      <DialogTitle>Schedule Lesson slot</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Subject</Label>
-                          <Select name="subject" defaultValue="Mathematics">
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {Object.keys(SUBJECTS).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+              
+              {isAdmin && (
+                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-9 text-xs font-bold gap-1.5 shadow-sm">
+                      <Plus className="h-3.5 w-3.5" /> Add Lesson
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <form onSubmit={handleAddLesson}>
+                      <DialogHeader>
+                        <DialogTitle>Schedule Lesson slot</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Subject</Label>
+                            <Select name="subject" defaultValue="Mathematics">
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {Object.keys(SUBJECTS).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Teacher</Label>
+                            <Input name="teacher" placeholder="e.g. Mr. Nyathi" required />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Day</Label>
+                            <Select name="day" defaultValue="Monday">
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Period</Label>
+                            <Select name="period" defaultValue="Period 1">
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {PERIODS.map(p => <SelectItem key={p.label} value={p.label}>{p.label} ({p.time})</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <div className="space-y-2">
-                          <Label>Teacher</Label>
-                          <Input name="teacher" placeholder="e.g. Mr. Nyathi" required />
+                          <Label>Room/Location</Label>
+                          <Input name="room" placeholder="e.g. Room 3A" required />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Day</Label>
-                          <Select name="day" defaultValue="Monday">
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Period</Label>
-                          <Select name="period" defaultValue="Period 1">
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {PERIODS.map(p => <SelectItem key={p.label} value={p.label}>{p.label} ({p.time})</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Room/Location</Label>
-                        <Input name="room" placeholder="e.g. Room 3A" required />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600">
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Finalize Slot
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                      <DialogFooter>
+                        <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600">
+                          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Finalize Slot
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-gray-100">
@@ -240,9 +296,11 @@ export default function TimetableCalendarPage() {
                         return (
                           <div key={day} className="bg-white p-1 min-h-[80px]">
                             <div className={`h-full rounded-lg border p-2 relative group hover:shadow-md transition-all ${config.color}`}>
-                              <button onClick={() => handleDelete(lesson.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/50 transition-opacity">
-                                <X className="w-3 h-3" />
-                              </button>
+                              {isAdmin && (
+                                <button onClick={() => handleDelete(lesson.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/50 transition-opacity">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
                               <p className="text-[10px] font-bold leading-tight">{lesson.subject}</p>
                               <p className="text-[9px] opacity-80 mt-0.5">{lesson.teacher}</p>
                               <div className="flex items-center gap-1 text-[8px] opacity-60 mt-1.5">
