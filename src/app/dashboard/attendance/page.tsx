@@ -8,16 +8,15 @@ import {
   Clock, 
   TriangleAlert, 
   Database, 
-  Download, 
-  ChevronDown, 
   Search, 
-  Calendar,
   CircleCheck,
   Loader2,
-  Server
+  Calendar,
+  ArrowUpRight
 } from 'lucide-react';
 import { ref, update, serverTimestamp } from 'firebase/database';
 import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
   'present': { label: 'Present', color: 'bg-green-100 text-green-700', icon: CircleCheck },
@@ -30,9 +29,9 @@ const STATUS_CYCLE = ['present', 'absent', 'late', 'excused'];
 
 export default function AttendancePage() {
   const [search, setSearch] = useState('');
-  const [classFilter, setClassFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [gradeFilter, setGradeFilter] = useState('All');
   const database = useDatabase();
+  const { toast } = useToast();
 
   const { data: attendanceData, loading } = useRTDBCollection(database, 'attendance');
 
@@ -42,11 +41,10 @@ export default function AttendancePage() {
       const matchesSearch = 
         s.studentName?.toLowerCase().includes(search.toLowerCase()) ||
         s.studentId?.toLowerCase().includes(search.toLowerCase());
-      const matchesClass = classFilter === 'All' || s.grade === classFilter;
-      const matchesStatus = statusFilter === 'All' || s.status === statusFilter;
-      return matchesSearch && matchesClass && matchesStatus;
+      const matchesGrade = gradeFilter === 'All' || s.grade === gradeFilter;
+      return matchesSearch && matchesGrade;
     });
-  }, [attendanceData, search, classFilter, statusFilter]);
+  }, [attendanceData, search, gradeFilter]);
 
   const stats = useMemo(() => {
     if (!attendanceData || attendanceData.length === 0) return { present: 0, absent: 0, late: 0, excused: 0, total: 0 };
@@ -75,10 +73,14 @@ export default function AttendancePage() {
     const nextStatus = STATUS_CYCLE[nextIndex];
     
     const dbRef = ref(database, `attendance/${id}`);
-    update(dbRef, { 
-      status: nextStatus, 
-      lastUpdated: serverTimestamp() 
-    }).catch(err => console.error("Update failed:", err));
+    try {
+      await update(dbRef, { 
+        status: nextStatus, 
+        lastUpdated: serverTimestamp() 
+      });
+    } catch (err) {
+      toast({ title: "Update Failed", description: "Check permissions.", variant: "destructive" });
+    }
   };
 
   const getInitials = (name: string) => {
@@ -86,87 +88,114 @@ export default function AttendancePage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar">
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* High-Fidelity Header */}
+      <div className="bg-gradient-to-r from-[#1E3A5F] via-[#1E3A5F] to-[#0D9488] rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <svg viewBox="0 0 400 200" className="w-full h-full">
+            <circle cx="350" cy="30" r="80" fill="white" />
+            <circle cx="100" cy="180" r="120" fill="white" />
+          </svg>
+        </div>
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
+            <CheckCircle2 className="w-7 h-7" />
+          </div>
           <div>
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              Attendance Management
-              <span className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[9px] font-semibold rounded-full flex items-center gap-1">
-                <Database className="h-2.5 w-2.5" /> Realtime Sync
-              </span>
-            </h2>
-            <p className="text-xs text-gray-500">Daily register powered by Firebase Realtime Database</p>
+            <h2 className="text-xl font-bold">Attendance Management</h2>
+            <p className="text-sm text-white/80 mt-1">Daily register powered by Firebase Realtime Database</p>
           </div>
-          <div className="flex gap-2">
-            <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 shadow-sm">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Submit Attendance
-            </button>
+          <div className="ml-auto hidden md:flex items-center gap-3">
+            <div className="px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
+              <Database className="w-3.5 h-3.5" /> Sync Active
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatSummaryCard label="Present" value={stats.present} percent={stats.presentPct || '0.0'} color="bg-green-50 text-green-600" icon={<CircleCheck className="h-4 w-4" />} />
-          <StatSummaryCard label="Absent" value={stats.absent} percent={stats.absentPct || '0.0'} color="bg-red-50 text-red-600" icon={<CircleX className="h-4 w-4" />} />
-          <StatSummaryCard label="Late" value={stats.late} percent={stats.latePct || '0.0'} color="bg-amber-50 text-amber-600" icon={<Clock className="h-4 w-4" />} />
-          <StatSummaryCard label="Excused" value={stats.excused} percent={stats.excusedPct || '0.0'} color="bg-blue-50 text-blue-600" icon={<TriangleAlert className="h-4 w-4" />} />
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatSummaryCard label="Present" value={stats.present} percent={stats.presentPct || '0.0'} color="bg-green-50 text-green-600" icon={<CircleCheck className="h-4 w-4" />} />
+        <StatSummaryCard label="Absent" value={stats.absent} percent={stats.absentPct || '0.0'} color="bg-red-50 text-red-600" icon={<CircleX className="h-4 w-4" />} />
+        <StatSummaryCard label="Late" value={stats.late} percent={stats.latePct || '0.0'} color="bg-amber-50 text-amber-600" icon={<Clock className="h-4 w-4" />} />
+        <StatSummaryCard label="Excused" value={stats.excused} percent={stats.excusedPct || '0.0'} color="bg-blue-50 text-blue-600" icon={<TriangleAlert className="h-4 w-4" />} />
+      </div>
 
-        {/* Main Content Card */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-5">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                  <input 
-                    type="text" 
-                    placeholder="Search pupils..." 
-                    className="w-full pl-9 pr-4 py-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-teal-500/20 focus:border-teal-500 bg-white" 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-5">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative flex-1 w-full max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search pupils by name or ID..." 
+                  className="w-full pl-9 pr-4 py-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-teal-500 bg-white" 
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select 
+                  className="px-3 py-2 text-xs border border-gray-200 rounded-lg outline-none bg-white font-bold text-gray-600"
+                  value={gradeFilter}
+                  onChange={(e) => setGradeFilter(e.target.value)}
+                >
+                  <option value="All">All Grades</option>
+                  {['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+                <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 shadow-sm whitespace-nowrap">
+                  <Calendar className="h-3.5 w-3.5" /> History
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <Loader2 className="h-10 w-10 animate-spin text-teal-600 mb-2" />
+                  <p className="text-xs text-gray-400 italic">Syncing medical register...</p>
                 </div>
-              </div>
+              ) : filteredData.length > 0 ? (
+                <div className="divide-y divide-gray-50">
+                  {filteredData.map((item: any, idx: number) => {
+                    const status = item.status || 'absent';
+                    const config = STATUS_CONFIG[status] || STATUS_CONFIG['absent'];
+                    const StatusIcon = config.icon;
 
-              <div className="space-y-1">
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-2" />
-                    <p className="text-xs text-gray-400 italic">Syncing with RTDB...</p>
-                  </div>
-                ) : filteredData.length > 0 ? filteredData.map((item: any, idx: number) => {
-                  const status = item.status || 'absent';
-                  const config = STATUS_CONFIG[status] || STATUS_CONFIG['absent'];
-                  const StatusIcon = config.icon;
-
-                  return (
-                    <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors group">
-                      <span className="text-[10px] text-gray-400 w-6 font-medium">{idx + 1}</span>
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ${item.gender === 'Female' ? 'bg-pink-500' : 'bg-blue-500'}`}>
-                        {getInitials(item.studentName)}
+                    return (
+                      <div key={item.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-all group">
+                        <span className="text-[10px] text-gray-400 w-6 font-bold">{idx + 1}</span>
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${item.gender === 'Female' ? 'bg-pink-500' : 'bg-blue-500'}`}>
+                          {getInitials(item.studentName)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate">{item.studentName}</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">{item.grade}</p>
+                        </div>
+                        <div className="hidden lg:flex items-center gap-2 text-[10px] text-gray-400 font-medium px-4">
+                          <Clock className="h-3 w-3" />
+                          <span>Last updated: {item.lastUpdated ? new Date(item.lastUpdated).toLocaleTimeString() : 'Never'}</span>
+                        </div>
+                        <button 
+                          onClick={() => toggleStatus(item.id, status)}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-bold transition-all shadow-sm ${config.color} hover:scale-105 active:scale-95`}
+                        >
+                          <StatusIcon className="h-3 w-3" />
+                          {config.label}
+                        </button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-800 truncate">{item.studentName}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{item.grade}</p>
-                      </div>
-                      <button 
-                        onClick={() => toggleStatus(item.id, status)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm ${config.color}`}
-                      >
-                        <StatusIcon className="h-3 w-3" />
-                        {config.label}
-                      </button>
-                    </div>
-                  )
-                }) : (
-                  <div className="text-center py-12 text-gray-400 italic text-xs">
-                    No records found.
-                  </div>
-                )}
-              </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-2xl">
+                  <CheckCircle2 className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm text-gray-400 font-medium">No records matching filters.</p>
+                  <p className="text-xs text-gray-300 mt-1">Check your search terms or grade selection.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -177,12 +206,17 @@ export default function AttendancePage() {
 
 function StatSummaryCard({ label, value, percent, color, icon }: any) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow group">
-      <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center mb-2 transition-transform group-hover:scale-110 shadow-sm`}>
-        {icon}
+    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all group">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm`}>
+          {icon}
+        </div>
+        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 bg-emerald-50 px-1.5 py-0.5 rounded">
+          <ArrowUpRight className="w-2.5 h-2.5" /> {percent}%
+        </span>
       </div>
-      <p className="text-xl font-bold text-gray-800">{value}</p>
-      <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{label} ({percent}%)</p>
+      <p className="text-2xl font-bold text-gray-800">{value}</p>
+      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{label} Rate</p>
     </div>
   );
 }
