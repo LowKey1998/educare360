@@ -3,7 +3,6 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { 
-  Download, 
   Plus, 
   BookOpen, 
   FileText, 
@@ -14,14 +13,13 @@ import {
   Database,
   Loader2,
   Clock,
-  Baby,
   GraduationCap,
   CalendarCheck,
-  Search,
-  Trash2
+  Trash2,
+  Settings2,
+  Timer
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
-import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
   DialogContent, 
@@ -42,7 +40,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { academicService } from '@/services/academic';
-import { Lesson, Exam, Student, UserProfile, Classroom } from '@/lib/types';
+import { Lesson, Exam, Student, UserProfile, Classroom, PeriodStructure } from '@/lib/types';
 
 const SUBJECTS: Record<string, { color: string }> = {
   'Mathematics': { color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -60,7 +58,13 @@ export default function TimetableCalendarPage() {
   const [activeGrade, setActiveGrade] = useState('');
   const [isAddLessonOpen, setIsAddLessonOpen] = useState(false);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
+  const [isAddPeriodOpen, setIsAddPeriodOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Lesson form state for auto-filling from period
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('manual');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
 
   const database = useDatabase();
   const { profile } = useUserProfile();
@@ -68,6 +72,7 @@ export default function TimetableCalendarPage() {
   
   const { data: timetable, loading: ttLoading } = useRTDBCollection<Lesson>(database, 'timetable');
   const { data: exams, loading: examsLoading } = useRTDBCollection<Exam>(database, 'exams');
+  const { data: periods, loading: periodsLoading } = useRTDBCollection<PeriodStructure>(database, 'period_structures');
   const { data: students } = useRTDBCollection<Student>(database, 'students');
   const { data: users } = useRTDBCollection<UserProfile>(database, 'users');
   const { data: classrooms } = useRTDBCollection<Classroom>(database, 'classrooms');
@@ -104,6 +109,20 @@ export default function TimetableCalendarPage() {
     return timetable.filter((l) => l.grade === activeGrade);
   }, [timetable, activeGrade]);
 
+  const handlePeriodSelect = (periodId: string) => {
+    setSelectedPeriodId(periodId);
+    if (periodId === 'manual') {
+      setStartTime('');
+      setEndTime('');
+    } else {
+      const period = periods.find(p => p.id === periodId);
+      if (period) {
+        setStartTime(period.startTime);
+        setEndTime(period.endTime);
+      }
+    }
+  };
+
   const handleAddLesson = async (e: React.FormEvent<HTMLFormElement>) => {
     if (!isAdmin) return;
     e.preventDefault();
@@ -111,6 +130,12 @@ export default function TimetableCalendarPage() {
     const formData = new FormData(e.currentTarget);
     const teacherId = formData.get('teacherId') as string;
     const teacher = teachers.find(t => t.uid === teacherId);
+    
+    let periodName = formData.get('period') as string;
+    if (selectedPeriodId !== 'manual') {
+      const p = periods.find(p => p.id === selectedPeriodId);
+      if (p) periodName = p.name;
+    }
 
     const data: Omit<Lesson, 'id' | 'createdAt'> = {
       grade: activeGrade,
@@ -119,15 +144,41 @@ export default function TimetableCalendarPage() {
       teacherName: teacher?.displayName || 'Unknown',
       room: formData.get('room') as string,
       day: formData.get('day') as string,
-      period: formData.get('period') as string,
-      startTime: formData.get('startTime') as string,
-      endTime: formData.get('endTime') as string,
+      period: periodName,
+      startTime: startTime,
+      endTime: endTime,
     };
 
     try {
       await academicService.scheduleLesson(database, data);
       setIsAddLessonOpen(false);
       toast({ title: "Lesson Scheduled", description: `${data.subject} added to ${activeGrade}.` });
+      // Reset form
+      setSelectedPeriodId('manual');
+      setStartTime('');
+      setEndTime('');
+    } catch (e) {
+      toast({ title: "Error", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddPeriod = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const data: Omit<PeriodStructure, 'id' | 'createdAt'> = {
+      name: formData.get('name') as string,
+      startTime: formData.get('startTime') as string,
+      endTime: formData.get('endTime') as string,
+    };
+
+    try {
+      await academicService.addPeriodStructure(database, data);
+      setIsAddPeriodOpen(false);
+      toast({ title: "Period Created", description: `${data.name} is now available.` });
     } catch (e) {
       toast({ title: "Error", variant: "destructive" });
     } finally {
@@ -212,7 +263,7 @@ export default function TimetableCalendarPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<BookOpen className="w-4 h-4 text-violet-600" />} label="Lessons Active" value={ttLoading ? '...' : timetable.length.toString()} color="bg-violet-50" />
         <StatCard icon={<FileText className="w-4 h-4 text-red-600" />} label="Upcoming Exams" value={examsLoading ? '...' : exams.length.toString()} color="bg-red-50" />
-        <StatCard icon={<GraduationCap className="w-4 h-4 text-blue-600" />} label="Classes Linked" value={availableGrades.length.toString()} color="bg-blue-50" />
+        <StatCard icon={<Timer className="w-4 h-4 text-amber-600" />} label="Standard Periods" value={periodsLoading ? '...' : periods.length.toString()} color="bg-amber-50" />
         <StatCard icon={<CalendarCheck className="w-4 h-4 text-teal-600" />} label="Session Phase" value="Term 1 Active" color="bg-teal-50" />
       </div>
 
@@ -220,6 +271,7 @@ export default function TimetableCalendarPage() {
         <div className="flex border-b border-gray-100 px-4 overflow-x-auto bg-gray-50/30">
           <TabButton active={activeTab === 'timetable'} onClick={() => setActiveTab('timetable')} label="Weekly Schedule" />
           <TabButton active={activeTab === 'exams'} onClick={() => setActiveTab('exams')} label="Terminal Exams" />
+          {isAdmin && <TabButton active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} label="Period Setup" />}
         </div>
 
         <div className="p-5">
@@ -242,7 +294,7 @@ export default function TimetableCalendarPage() {
                         <Plus className="h-3.5 w-3.5" /> Schedule Lesson
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-xl">
                       <form onSubmit={handleAddLesson}>
                         <DialogHeader><DialogTitle>Schedule Academic Slot</DialogTitle></DialogHeader>
                         <div className="grid gap-4 py-4">
@@ -262,26 +314,61 @@ export default function TimetableCalendarPage() {
                               </Select>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-4">
+                          
+                          <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-4">
                             <div className="space-y-2">
-                              <Label>Day</Label>
-                              <Select name="day" defaultValue="Monday">
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>{DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Period Slot</Label>
+                              <Select value={selectedPeriodId} onValueChange={handlePeriodSelect}>
+                                <SelectTrigger className="bg-white">
+                                  <SelectValue placeholder="Select Period..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="manual">Manual Time Entry</SelectItem>
+                                  {periods.map(p => (
+                                    <SelectItem key={p.id} value={p.id}>{p.name} ({p.startTime} - {p.endTime})</SelectItem>
+                                  ))}
+                                </SelectContent>
                               </Select>
                             </div>
-                            <div className="space-y-2">
-                              <Label>Start Time</Label>
-                              <Input name="startTime" type="time" required />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>End Time</Label>
-                              <Input name="endTime" type="time" required />
+
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <Label>Day</Label>
+                                <Select name="day" defaultValue="Monday">
+                                  <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                  <SelectContent>{DAYS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Start Time</Label>
+                                <Input 
+                                  className="bg-white"
+                                  name="startTime" 
+                                  type="time" 
+                                  required 
+                                  value={startTime}
+                                  onChange={(e) => setStartTime(e.target.value)}
+                                  readOnly={selectedPeriodId !== 'manual'}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>End Time</Label>
+                                <Input 
+                                  className="bg-white"
+                                  name="endTime" 
+                                  type="time" 
+                                  required 
+                                  value={endTime}
+                                  onChange={(e) => setEndTime(e.target.value)}
+                                  readOnly={selectedPeriodId !== 'manual'}
+                                />
+                              </div>
                             </div>
                           </div>
+
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Period Tag</Label>
+                              <Label>Period Tag / Name</Label>
                               <Input name="period" placeholder="e.g. Period 1" required />
                             </div>
                             <div className="space-y-2">
@@ -303,7 +390,6 @@ export default function TimetableCalendarPage() {
                     <div className="bg-gray-50 p-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Day</div>
                     {DAYS.map(day => <div key={day} className="bg-gray-50 p-3 text-[10px] font-bold text-gray-700 uppercase tracking-widest text-center">{day}</div>)}
                     
-                    {/* Compact View for Timeline */}
                     <div className="contents">
                       <div className="bg-white p-3 text-center border-r border-gray-100 flex flex-col justify-center min-h-[120px]">
                         <p className="text-[10px] font-bold text-gray-800">Academic Sessions</p>
@@ -320,7 +406,7 @@ export default function TimetableCalendarPage() {
                                   <p className="font-bold leading-tight truncate">{lesson.subject}</p>
                                   <p className="text-[9px] opacity-80 mt-0.5 truncate">{lesson.teacherName}</p>
                                   <div className="flex items-center justify-between mt-1.5 opacity-60 text-[8px]">
-                                    <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" /> {lesson.startTime}</span>
+                                    <span className="flex items-center gap-1 font-bold"><Clock className="w-2.5 h-2.5" /> {lesson.startTime}</span>
                                     <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {lesson.room}</span>
                                   </div>
                                 </div>
@@ -352,8 +438,17 @@ export default function TimetableCalendarPage() {
                         <DialogHeader><DialogTitle>Schedule Terminal Exam</DialogTitle></DialogHeader>
                         <div className="grid gap-4 py-4">
                           <div className="grid grid-cols-2 gap-4">
-                            <Input name="grade" placeholder="Grade (e.g. Grade 7)" required />
-                            <Input name="subject" placeholder="Subject" required />
+                            <div className="space-y-2">
+                              <Label>Grade</Label>
+                              <Select name="grade" required>
+                                <SelectTrigger><SelectValue placeholder="Select grade..." /></SelectTrigger>
+                                <SelectContent>{availableGrades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Subject</Label>
+                              <Input name="subject" placeholder="Subject" required />
+                            </div>
                           </div>
                           <div className="grid grid-cols-3 gap-4">
                             <Input name="date" type="date" required />
@@ -398,6 +493,72 @@ export default function TimetableCalendarPage() {
               ) : (
                 <div className="p-20 text-center text-gray-400 italic text-xs border-2 border-dashed rounded-2xl">No terminal exams scheduled.</div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'periods' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800 uppercase tracking-tight">Institutional Period Structure</h3>
+                  <p className="text-[10px] text-gray-400 font-medium">Define global time slots for the weekly timetable.</p>
+                </div>
+                <Dialog open={isAddPeriodOpen} onOpenChange={setIsAddPeriodOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 h-8 text-[10px] font-bold gap-1.5 shadow-sm">
+                      <Plus className="h-3 w-3" /> Add Period Slot
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <form onSubmit={handleAddPeriod}>
+                      <DialogHeader><DialogTitle>Configure Time Slot</DialogTitle></DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Period Name</Label>
+                          <Input name="name" placeholder="e.g. Period 1" required />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Start Time</Label>
+                            <Input name="startTime" type="time" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>End Time</Label>
+                            <Input name="endTime" type="time" required />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter><Button type="submit" disabled={isSubmitting} className="w-full bg-amber-600">Save Period</Button></DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {periodsLoading ? (
+                  <div className="col-span-full py-20 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-amber-500" /></div>
+                ) : periods.length > 0 ? periods.sort((a, b) => a.startTime.localeCompare(b.startTime)).map((p) => (
+                  <div key={p.id} className="p-4 border border-gray-100 rounded-xl bg-gray-50/50 flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
+                        <Timer className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-800">{p.name}</p>
+                        <p className="text-[10px] text-gray-400 font-bold">{p.startTime} - {p.endTime}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => academicService.deletePeriodStructure(database, p.id)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )) : (
+                  <div className="col-span-full p-20 text-center border-2 border-dashed rounded-2xl bg-gray-50/30">
+                    <Timer className="h-10 w-10 text-gray-200 mx-auto mb-2" />
+                    <p className="text-sm text-gray-400 font-medium">No period slots defined yet.</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

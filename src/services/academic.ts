@@ -1,6 +1,6 @@
 
 import { Database, ref, push, remove, update, serverTimestamp } from 'firebase/database';
-import { Classroom, Lesson, LessonPlan, Exam } from '@/lib/types';
+import { Classroom, Lesson, LessonPlan, Exam, PeriodStructure } from '@/lib/types';
 
 export const academicService = {
   async saveMarks(db: Database, subject: string, marks: Record<string, number>) {
@@ -63,5 +63,16 @@ export const academicService = {
       ...data,
       createdAt: serverTimestamp()
     });
+  },
+
+  async addPeriodStructure(db: Database, data: Omit<PeriodStructure, 'id' | 'createdAt'>) {
+    return push(ref(db, 'period_structures'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  },
+
+  async deletePeriodStructure(db: Database, id: string) {
+    return remove(ref(db, `period_structures/${id}`));
   }
 };

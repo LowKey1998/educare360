@@ -180,3 +180,11 @@ export interface AppNotification {
   createdAt: any;
   link?: string;
 }
+
+export interface PeriodStructure {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  createdAt?: any;
+}
