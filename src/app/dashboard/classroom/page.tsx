@@ -16,7 +16,6 @@ import {
   Database
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, push, remove, serverTimestamp } from 'firebase/database';
 import { 
   Dialog, 
   DialogContent, 
@@ -29,6 +28,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { academicService } from '@/services/academic';
+import { Classroom } from '@/lib/types';
 
 export default function ClassroomManagementPage() {
   const [search, setSearch] = useState('');
@@ -37,7 +38,7 @@ export default function ClassroomManagementPage() {
   
   const database = useDatabase();
   const { toast } = useToast();
-  const { data: classrooms, loading } = useRTDBCollection(database, 'classrooms');
+  const { data: classrooms, loading } = useRTDBCollection<Classroom>(database, 'classrooms');
 
   const filteredClassrooms = useMemo(() => {
     return classrooms.filter((c: any) => 
@@ -50,17 +51,16 @@ export default function ClassroomManagementPage() {
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    const data = {
-      name: formData.get('name'),
-      teacher: formData.get('teacher'),
-      location: formData.get('location'),
+    const data: Omit<Classroom, 'id'> = {
+      name: formData.get('name') as string,
+      teacher: formData.get('teacher') as string,
+      location: formData.get('location') as string,
       capacity: parseInt(formData.get('capacity') as string) || 35,
       status: 'Active',
-      createdAt: serverTimestamp()
     };
 
     try {
-      await push(ref(database, 'classrooms'), data);
+      await academicService.addClassroom(database, data);
       setIsAddOpen(false);
       toast({ title: "Classroom Added", description: `${data.name} is now ready.` });
     } catch (e) {
@@ -73,7 +73,7 @@ export default function ClassroomManagementPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this learning space?')) return;
     try {
-      await remove(ref(database, `classrooms/${id}`));
+      await academicService.deleteClassroom(database, id);
       toast({ title: "Removed", description: "Classroom deleted." });
     } catch (e) {
       toast({ title: "Error", description: "Delete failed." });
@@ -82,14 +82,7 @@ export default function ClassroomManagementPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <svg viewBox="0 0 400 200" className="w-full h-full">
-            <circle cx="350" cy="30" r="80" fill="white" />
-            <circle cx="50" cy="180" r="100" fill="white" />
-          </svg>
-        </div>
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
             <BookOpen className="w-7 h-7" />
@@ -141,7 +134,7 @@ export default function ClassroomManagementPage() {
                     <div className="grid gap-4 py-4">
                       <div className="space-y-2">
                         <Label>Room Name/Code</Label>
-                        <Input name="name" placeholder="e.g. Grade 2A, Science Lab 1" required />
+                        <Input name="name" placeholder="e.g. Grade 2A" required />
                       </div>
                       <div className="space-y-2">
                         <Label>Assigned Teacher</Label>
@@ -172,7 +165,7 @@ export default function ClassroomManagementPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="h-10 w-10 animate-spin text-amber-600 mb-2" />
-                <p className="text-xs text-gray-400 italic">Syncing learning spaces...</p>
+                <p className="text-xs text-gray-400 italic">Syncing rooms...</p>
               </div>
             ) : filteredClassrooms.length > 0 ? (
               <div className="overflow-x-auto border border-gray-50 rounded-xl">
@@ -183,7 +176,6 @@ export default function ClassroomManagementPage() {
                       <th className="text-left py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Teacher</th>
                       <th className="text-left py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Location</th>
                       <th className="text-center py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Capacity</th>
-                      <th className="text-left py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Status</th>
                       <th className="text-right py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Action</th>
                     </tr>
                   </thead>
@@ -200,12 +192,7 @@ export default function ClassroomManagementPage() {
                             <MapPin className="w-3 h-3 text-amber-500" /> {room.location}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className="font-bold text-gray-800">{room.capacity}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700">Active</span>
-                        </td>
+                        <td className="py-3 px-4 text-center font-bold text-gray-800">{room.capacity}</td>
                         <td className="py-3 px-4 text-right">
                           <button onClick={() => handleDelete(room.id)} className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-600 hover:bg-red-50 transition-all">
                             <Trash2 className="w-3.5 h-3.5" />
@@ -220,7 +207,6 @@ export default function ClassroomManagementPage() {
               <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-2xl">
                 <BookOpen className="h-10 w-10 text-gray-200 mx-auto mb-3" />
                 <p className="text-sm text-gray-400 font-medium">No classrooms configured.</p>
-                <p className="text-xs text-gray-300 mt-1">Start by defining learning spaces for your institution.</p>
               </div>
             )}
           </div>

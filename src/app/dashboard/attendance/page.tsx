@@ -14,9 +14,9 @@ import {
   Calendar,
   ArrowUpRight
 } from 'lucide-react';
-import { ref, update, serverTimestamp } from 'firebase/database';
 import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { studentService } from '@/services/students';
 
 const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
   'present': { label: 'Present', color: 'bg-green-100 text-green-700', icon: CircleCheck },
@@ -41,7 +41,6 @@ export default function AttendancePage() {
   const filteredData = useMemo(() => {
     if (!attendanceData) return [];
     
-    // If parent, only show their children
     const baseData = profile?.role === 'parent' 
       ? attendanceData.filter((s: any) => s.parentEmail?.toLowerCase() === profile.email?.toLowerCase())
       : attendanceData;
@@ -81,12 +80,8 @@ export default function AttendancePage() {
     const nextIndex = (STATUS_CYCLE.indexOf(currentStatus) + 1) % STATUS_CYCLE.length;
     const nextStatus = STATUS_CYCLE[nextIndex];
     
-    const dbRef = ref(database, `attendance/${id}`);
     try {
-      await update(dbRef, { 
-        status: nextStatus, 
-        lastUpdated: serverTimestamp() 
-      });
+      await studentService.updateAttendance(database, id, nextStatus);
     } catch (err) {
       toast({ title: "Update Failed", description: "Check permissions.", variant: "destructive" });
     }
@@ -98,14 +93,7 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-[#1E3A5F] via-[#1E3A5F] to-[#0D9488] rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <svg viewBox="0 0 400 200" className="w-full h-full">
-            <circle cx="350" cy="30" r="80" fill="white" />
-            <circle cx="100" cy="180" r="120" fill="white" />
-          </svg>
-        </div>
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
             <CheckCircle2 className="w-7 h-7" />

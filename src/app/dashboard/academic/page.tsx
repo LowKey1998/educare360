@@ -4,15 +4,13 @@
 import { useState, useMemo } from 'react';
 import { 
   GraduationCap, 
-  Search,
-  BookOpen,
-  Plus,
-  Save,
-  Loader2,
-  Trophy,
-  Database,
-  TrendingUp,
-  FileText
+  BookOpen, 
+  Save, 
+  Loader2, 
+  Trophy, 
+  Database, 
+  TrendingUp, 
+  FileText 
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -37,9 +35,10 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, update, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { academicService } from '@/services/academic';
+import { Student } from '@/lib/types';
 
 const trendData = [
   { name: 'T1 2025', grade4: 68, grade5: 72, grade6: 75, grade7: 70 },
@@ -56,7 +55,7 @@ export default function AcademicManagementPage() {
   
   const database = useDatabase();
   const { toast } = useToast();
-  const { data: students, loading } = useRTDBCollection(database, 'students');
+  const { data: students, loading } = useRTDBCollection<Student>(database, 'students');
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => s.grade === activeGrade);
@@ -93,14 +92,7 @@ export default function AcademicManagementPage() {
   const handleSaveMarks = async () => {
     setIsSaving(true);
     try {
-      const updates: any = {};
-      Object.entries(marks).forEach(([studentId, score]) => {
-        if (!isNaN(score)) {
-          updates[`students/${studentId}/marks/${activeSubject}`] = score;
-          updates[`students/${studentId}/lastAcademicUpdate`] = serverTimestamp();
-        }
-      });
-      await update(ref(database), updates);
+      await academicService.saveMarks(database, activeSubject, marks);
       toast({ title: "Marks Saved", description: `Updated ${Object.keys(marks).length} records for ${activeSubject}.` });
       setMarks({});
     } catch (e) {
@@ -121,14 +113,7 @@ export default function AcademicManagementPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <svg viewBox="0 0 400 200" className="w-full h-full">
-            <circle cx="350" cy="30" r="80" fill="white" />
-            <circle cx="100" cy="180" r="120" fill="white" />
-          </svg>
-        </div>
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
             <GraduationCap className="w-7 h-7" />

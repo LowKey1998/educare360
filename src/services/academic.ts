@@ -30,5 +30,11 @@ export const academicService = {
   },
   async deleteLesson(db: Database, id: string) {
     return remove(ref(db, `timetable/${id}`));
+  },
+  async logECD(db: Database, data: any) {
+    return push(ref(db, 'ecd_observations'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
   }
 };
