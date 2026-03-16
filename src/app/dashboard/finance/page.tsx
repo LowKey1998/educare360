@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Database, 
@@ -41,9 +42,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/services/finance';
-import { Student, Transaction } from '@/lib/types';
+import { Student, Transaction, SystemSettings } from '@/lib/types';
 
-const COLORS = ['#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
 const GRADES = ['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
 export default function FinanceBillingPage() {
@@ -53,7 +53,7 @@ export default function FinanceBillingPage() {
   
   const { data: allStudents, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
   const { data: allTransactions, loading: txLoading } = useRTDBCollection<Transaction>(database, 'transactions');
-  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const { data: schoolSettings } = useRTDBDoc<SystemSettings>(database, 'system_settings');
   
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -66,9 +66,17 @@ export default function FinanceBillingPage() {
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
-  const isParent = profile?.role === 'parent';
   const loading = studentsLoading || txLoading;
   const currencySymbol = schoolSettings?.currencySymbol || '$';
+
+  // Load existing fee data from school settings when they become available
+  useEffect(() => {
+    if (schoolSettings) {
+      if (schoolSettings.lastFeeAmount !== undefined) setFeeAmount(schoolSettings.lastFeeAmount.toString());
+      if (schoolSettings.lastFeeTerm) setFeeTerm(schoolSettings.lastFeeTerm);
+      if (schoolSettings.lastFeeGrades) setSelectedGrades(schoolSettings.lastFeeGrades);
+    }
+  }, [schoolSettings, isConfigOpen]);
 
   // Role-based data filtering
   const students = useMemo(() => {
@@ -146,8 +154,6 @@ export default function FinanceBillingPage() {
         selectedGrades
       );
       setIsConfigOpen(false);
-      setFeeAmount('');
-      setSelectedGrades([]);
       toast({ 
         title: "Fees Applied", 
         description: `Successfully billed ${count} students for ${feeTerm}.` 
@@ -193,7 +199,7 @@ export default function FinanceBillingPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <FinanceMetricCard label="Total Billed" value={`${currencySymbol}${stats?.totalBilled}`} trend={isAdmin ? "Global" : "Household"} icon={<CreditCard className="w-4 h-4 text-blue-600" />} color="bg-blue-50" />
         <FinanceMetricCard label="Outstanding" value={`${currencySymbol}${stats?.arrears}`} trend={`${stats?.unpaidPct}% of total`} icon={<Wallet className="w-4 h-4 text-amber-600" />} color="bg-amber-50" isPositive={false} />
-        <FinanceMetricCard label={isAdmin ? "Collection Rate" : "Attendance Factor"} value={`${stats?.collectionRate}%`} trend={isAdmin ? "Target: 90%" : "Financial Health"} icon={<TrendingUp className="w-4 h-4 text-emerald-600" />} color="bg-emerald-50" />
+        <FinanceMetricCard label={isAdmin ? "Collection Rate" : "Attendance Factor"} value={`${stats?.collectionRate}%`} trend={isAdmin ? "Target: 90%" : "Financial Health"} icon={<TrendingUp className="h-4 w-4 text-emerald-600" />} color="bg-emerald-50" />
         <FinanceMetricCard label={isAdmin ? "Active Debtors" : "Pupils Billed"} value={isAdmin ? (stats?.debtors.toString() || '0') : students.length.toString()} trend={isAdmin ? "Pupils" : "In Account"} icon={<Users className="w-4 h-4 text-rose-600" />} color="bg-rose-50" isPositive={!isAdmin} />
       </div>
 
@@ -311,7 +317,7 @@ export default function FinanceBillingPage() {
                 <thead className="bg-gray-50 border-y border-gray-100 font-bold uppercase text-gray-500">
                   <tr>
                     <th className="px-4 py-3">Pupil</th>
-                    <th className="px-4 py-3">Grade</th>
+                    <th className="px-4 py-3 Grade">Grade</th>
                     <th className="px-4 py-3 text-right">Balance</th>
                     <th className="px-4 py-3 text-center">Status</th>
                   </tr>

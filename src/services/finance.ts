@@ -59,6 +59,12 @@ export const financeService = {
     });
 
     if (count > 0) {
+      // Save the last configuration to system_settings for easier reuse
+      updates['system_settings/lastFeeAmount'] = amount;
+      updates['system_settings/lastFeeTerm'] = term;
+      updates['system_settings/lastFeeGrades'] = grades;
+      updates['system_settings/updatedAt'] = serverTimestamp();
+
       await update(ref(db), updates);
       
       // Log this event in history/announcements or notify admins

@@ -189,6 +189,9 @@ export interface SystemSettings {
   instagramUrl?: string;
   privacyPolicy?: string;
   termsAndConditions?: string;
+  lastFeeAmount?: number;
+  lastFeeTerm?: string;
+  lastFeeGrades?: string[];
   updatedAt?: any;
 }
 
