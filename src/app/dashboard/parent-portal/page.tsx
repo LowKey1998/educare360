@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   ShieldCheck,
   MoreHorizontal,
-  UserCheck
+  UserCheck,
+  Plus
 } from 'lucide-react';
 import { useUserProfile, useDatabase, useRTDBCollection } from '@/firebase';
 import { 
@@ -37,6 +38,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { studentService } from '@/services/students';
 import { Student, UserProfile } from '@/lib/types';
@@ -52,9 +60,16 @@ export default function ParentPortalPage() {
   
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  
+  // UI States
   const [isEditEmailOpen, setIsEditEditEmailOpen] = useState(false);
+  const [isLinkOpen, setIsLinkOpen] = useState(false);
+  
+  // Action States
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [newEmail, setNewEmail] = useState('');
+  const [linkingParentEmail, setLinkingParentEmail] = useState('');
+  const [targetStudentId, setTargetStudentId] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
@@ -89,7 +104,7 @@ export default function ParentPortalPage() {
         displayName: account.displayName || 'Unnamed Parent',
         students: students.filter(s => s.parentEmail?.toLowerCase() === email),
         userId: account.uid,
-        lastLogin: account.createdAt // Using createdAt as proxy for this demo
+        lastLogin: account.createdAt
       });
     });
 
@@ -123,6 +138,21 @@ export default function ParentPortalPage() {
       toast({ title: "Email Updated", description: "Parent contact record synchronized." });
     } catch (e) {
       toast({ title: "Update Failed", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleLinkStudent = async () => {
+    if (!targetStudentId || !linkingParentEmail) return;
+    setIsUpdating(true);
+    try {
+      await studentService.updateParentEmail(database, targetStudentId, linkingParentEmail);
+      setIsLinkOpen(false);
+      setTargetStudentId('');
+      toast({ title: "Student Linked", description: `Record associated with ${linkingParentEmail}.` });
+    } catch (e) {
+      toast({ title: "Linking Failed", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
@@ -228,8 +258,16 @@ export default function ParentPortalPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
-                  {family.accountExists && family.students.length === 0 && (
-                    <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold gap-1 border-emerald-100 text-emerald-600 hover:bg-emerald-50">
+                  {family.accountExists && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setLinkingParentEmail(family.email);
+                        setIsLinkOpen(true);
+                      }}
+                      className="h-8 text-[10px] font-bold gap-1 border-emerald-100 text-emerald-600 hover:bg-emerald-50"
+                    >
                       <UserPlus className="h-3 w-3" /> Link Student
                     </Button>
                   )}
@@ -246,6 +284,46 @@ export default function ParentPortalPage() {
             )}
           </div>
         </div>
+
+        {/* Link Student Dialog */}
+        <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Link Student to Account</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Target Account</p>
+                <p className="text-xs font-bold text-gray-800">{linkingParentEmail}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Select Student from Registry</Label>
+                <Select value={targetStudentId} onValueChange={setTargetStudentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Search pupils..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students
+                      .filter(s => s.parentEmail?.toLowerCase() !== linkingParentEmail.toLowerCase())
+                      .map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade})</SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                  This action will update the student's parent email contact, granting the selected account portal access.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button disabled={isUpdating || !targetStudentId} onClick={handleLinkStudent} className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold">
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Finalize Association
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Email Dialog */}
         <Dialog open={isEditEmailOpen} onOpenChange={setIsEditEditEmailOpen}>
