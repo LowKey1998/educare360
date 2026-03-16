@@ -1,6 +1,6 @@
 
 import { Database, ref, set, push, remove, update, serverTimestamp } from 'firebase/database';
-import { SystemSettings, Announcement } from '@/lib/types';
+import { SystemSettings, Announcement, DocumentTemplate } from '@/lib/types';
 import { notificationService } from './notifications';
 
 export const systemService = {
@@ -25,6 +25,15 @@ export const systemService = {
     });
 
     return annRef;
+  },
+  
+  // Document Templates
+  async addTemplate(db: Database, data: Omit<DocumentTemplate, 'id' | 'createdAt'>) {
+    const templateRef = await push(ref(db, 'document_templates'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+    return templateRef;
   },
   async updateTemplateStatus(db: Database, id: string, status: string) {
     return update(ref(db, `document_templates/${id}`), { status });

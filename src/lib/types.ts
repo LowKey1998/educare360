@@ -195,3 +195,15 @@ export interface PeriodStructure {
   endTime: string;
   createdAt?: any;
 }
+
+export interface DocumentTemplate {
+  id: string;
+  title: string;
+  type: 'report-cards' | 'admission-letters' | 'fee-statements' | 'pupil-id' | 'certificates' | 'custom';
+  term?: string;
+  grades: string[];
+  fields: number;
+  format: string;
+  status: 'Active' | 'Draft';
+  createdAt: any;
+}
