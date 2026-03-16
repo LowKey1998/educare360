@@ -4,7 +4,6 @@
 import { useState, useMemo } from 'react';
 import { 
   GraduationCap, 
-  ClipboardCheck, 
   DollarSign, 
   MessageSquare,
   Clock,
@@ -337,7 +336,7 @@ export default function ParentPortalPage() {
             {activeChild?.marks ? Object.entries(activeChild.marks).map(([subject, score]: [string, any]) => (
               <div key={subject} className="flex flex-col gap-1.5 p-3 bg-gray-50/50 rounded-xl border border-gray-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-700 uppercase tracking-tight">{subject}</span>
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-tight">{subject}</span>
                   <span className="text-xs font-bold text-rose-600">{score}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">

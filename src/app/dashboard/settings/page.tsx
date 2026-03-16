@@ -4,23 +4,17 @@
 import { useState, useEffect } from 'react';
 import { 
   Settings, 
-  Building2, 
-  Calendar, 
-  Bell, 
-  Shield, 
   Save, 
   Loader2,
-  Globe,
   Mail,
   Phone,
   CheckCircle2,
   Upload,
   Link as LinkIcon,
-  ImageIcon,
   Palette,
   Quote
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

@@ -17,7 +17,7 @@ export const studentService = {
    * Creates the student record and marks the admission application as 'Enrolled'.
    */
   async enrollFromAdmission(db: Database, admissionId: string, studentData: Omit<Student, 'id' | 'createdAt' | 'feeBalance' | 'attendanceRate'>) {
-    const studentRef = push(ref(db, 'students'), {
+    const studentRef = await push(ref(db, 'students'), {
       ...studentData,
       feeBalance: 0,
       attendanceRate: 100,

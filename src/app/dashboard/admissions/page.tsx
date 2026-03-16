@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { 
   Plus, 
   Search, 
-  MoreHorizontal, 
   Database,
   Trash2,
   UserPlus,
@@ -137,7 +136,7 @@ export default function AdmissionsPage() {
       gender: formData.get('gender'),
       guardianName: formData.get('guardianName'),
       guardianPhone: formData.get('guardianPhone'),
-      parentEmail: formData.get('parentEmail'),
+      parentEmail: (formData.get('parentEmail') as string).toLowerCase().trim(),
       status: 'Active',
     };
 
