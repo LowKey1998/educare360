@@ -11,17 +11,18 @@ import {
   CircleAlert, 
   Search, 
   Calendar, 
-  Eye, 
-  PenLine, 
   Trash2,
   Loader2,
   Database,
-  ChefHat
+  ChefHat,
+  CheckCircle2,
+  XCircle,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { 
   Dialog, 
   DialogContent, 
@@ -33,22 +34,49 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { operationsService } from '@/services/operations';
-import { MealPlan } from '@/lib/types';
+import { studentService } from '@/services/students';
+import { MealPlan, Student } from '@/lib/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function MealsCateringPage() {
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isDietaryOpen, setIsDietaryOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [dietaryNotes, setDietaryNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const database = useDatabase();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
-  const { data: mealPlans, loading } = useRTDBCollection<MealPlan>(database, 'meal_plans');
+  const { data: mealPlans, loading: plansLoading } = useRTDBCollection<MealPlan>(database, 'meal_plans');
+  const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
+
+  const stats = useMemo(() => {
+    const subscribed = students.filter(s => s.isCateringSubscribed).length;
+    const dietaryAlerts = students.filter(s => s.dietaryRequirements && s.dietaryRequirements.length > 0).length;
+    return {
+      subscribers: subscribed,
+      todayCount: subscribed, // Simplification for today's forecast
+      revenue: (subscribed * 45).toLocaleString(), // Estimated revenue at $45/term
+      alerts: dietaryAlerts
+    };
+  }, [students]);
 
   const filteredPlans = useMemo(() => {
     return mealPlans.filter((p: any) => 
       p.title?.toLowerCase().includes(search.toLowerCase())
     );
   }, [mealPlans, search]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((s: Student) => 
+      s.studentName?.toLowerCase().includes(search.toLowerCase()) ||
+      s.grade?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [students, search]);
 
   const handleAddMealPlan = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -88,6 +116,33 @@ export default function MealsCateringPage() {
     }
   };
 
+  const toggleSubscription = async (student: Student) => {
+    try {
+      await studentService.updateCateringStatus(database, student.id, !student.isCateringSubscribed);
+      toast({ 
+        title: student.isCateringSubscribed ? "Subscription Cancelled" : "Student Subscribed",
+        description: `${student.studentName}'s catering status updated.`
+      });
+    } catch (e) {
+      toast({ title: "Update Failed", variant: "destructive" });
+    }
+  };
+
+  const handleSaveDietary = async () => {
+    if (!selectedStudent) return;
+    setIsSubmitting(true);
+    try {
+      await studentService.updateDietaryNotes(database, selectedStudent.id, dietaryNotes);
+      setIsDietaryOpen(false);
+      setSelectedStudent(null);
+      toast({ title: "Notes Updated" });
+    } catch (e) {
+      toast({ title: "Failed to update notes", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-rose-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
@@ -108,75 +163,75 @@ export default function MealsCateringPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <CateringMetricCard label="Subscribers" value="148" trend="+12" icon={<Users className="h-4.5 w-4.5 text-blue-600" />} color="bg-blue-50" />
-        <CateringMetricCard label="Today's Count" value="312" trend="+5%" icon={<UtensilsCrossed className="h-4.5 w-4.5 text-green-600" />} color="bg-green-50" />
-        <CateringMetricCard label="Monthly Revenue" value="$11,280" trend="+8%" icon={<DollarSign className="h-4.5 w-4.5 text-purple-600" />} color="bg-purple-50" />
-        <CateringMetricCard label="Dietary Alerts" value="18" trend="+2" icon={<CircleAlert className="h-4.5 w-4.5 text-amber-600" />} color="bg-amber-50" />
+        <CateringMetricCard label="Subscribers" value={studentsLoading ? '...' : stats.subscribers.toString()} trend="+12" icon={<Users className="h-4.5 w-4.5 text-blue-600" />} color="bg-blue-50" />
+        <CateringMetricCard label="Today's Forecast" value={studentsLoading ? '...' : stats.todayCount.toString()} trend="Active" icon={<UtensilsCrossed className="h-4.5 w-4.5 text-green-600" />} color="bg-green-50" />
+        <CateringMetricCard label="Est. Termly Revenue" value={`$${stats.revenue}`} trend="Billing" icon={<DollarSign className="h-4.5 w-4.5 text-purple-600" />} color="bg-purple-50" />
+        <CateringMetricCard label="Dietary Alerts" value={studentsLoading ? '...' : stats.alerts.toString()} trend="Flags" icon={<CircleAlert className="h-4.5 w-4.5 text-amber-600" />} color="bg-amber-50" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         <Tabs defaultValue="meal-plans" className="w-full">
-          <div className="flex border-b border-gray-100 px-2 overflow-x-auto bg-white sticky top-0 z-10">
+          <div className="flex items-center justify-between border-b border-gray-100 px-2 bg-white sticky top-0 z-10">
             <TabsList className="bg-transparent h-auto p-0 gap-0">
-              <TabsTrigger value="meal-plans" className="px-4 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:text-orange-600 rounded-none bg-transparent">Meal Plans</TabsTrigger>
-              <TabsTrigger value="subscriptions" className="px-4 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:text-orange-600 rounded-none bg-transparent">Subscriptions</TabsTrigger>
+              <TabsTrigger value="meal-plans" className="px-6 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:text-orange-600 rounded-none bg-transparent">Meal Plans</TabsTrigger>
+              <TabsTrigger value="subscriptions" className="px-6 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:text-orange-600 rounded-none bg-transparent">Subscription Registry</TabsTrigger>
             </TabsList>
+            <div className="px-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+                <Input placeholder="Search..." className="pl-8 h-8 text-[10px] w-48 border-gray-200" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+            </div>
           </div>
 
           <div className="p-5">
             <TabsContent value="meal-plans" className="m-0 space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                  <Input 
-                    placeholder="Search menus..." 
-                    className="pl-9 h-9 text-xs border-gray-200" 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="h-9 px-4 text-xs font-bold bg-orange-600 hover:bg-orange-700 gap-1.5 shadow-sm">
-                      <Plus className="h-3.5 w-3.5" /> New Meal Plan
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-xl">
-                    <form onSubmit={handleAddMealPlan}>
-                      <DialogHeader>
-                        <DialogTitle>Define Terminal Menu</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                          <Label>Plan Title</Label>
-                          <Input name="title" placeholder="e.g. Term 1 Standard Menu" required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Validity Period</Label>
-                          <Input name="range" placeholder="Jan 2026 - Apr 2026" required />
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 border-t pt-4">
-                          <Label className="font-bold text-[10px] text-gray-400 uppercase tracking-widest">Weekly Cycle</Label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <Input name="mon" placeholder="Monday Meal" required />
-                            <Input name="tue" placeholder="Tuesday Meal" required />
-                            <Input name="wed" placeholder="Wednesday Meal" required />
-                            <Input name="thu" placeholder="Thursday Meal" />
+              <div className="flex justify-end">
+                {isAdmin && (
+                  <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="h-9 px-4 text-xs font-bold bg-orange-600 hover:bg-orange-700 gap-1.5 shadow-sm">
+                        <Plus className="h-3.5 w-3.5" /> New Meal Plan
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl">
+                      <form onSubmit={handleAddMealPlan}>
+                        <DialogHeader>
+                          <DialogTitle>Define Terminal Menu</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Plan Title</Label>
+                            <Input name="title" placeholder="e.g. Term 1 Standard Menu" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Validity Period</Label>
+                            <Input name="range" placeholder="Jan 2026 - Apr 2026" required />
+                          </div>
+                          <div className="grid grid-cols-1 gap-3 border-t pt-4">
+                            <Label className="font-bold text-[10px] text-gray-400 uppercase tracking-widest">Weekly Cycle</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <Input name="mon" placeholder="Monday Meal" required />
+                              <Input name="tue" placeholder="Tuesday Meal" required />
+                              <Input name="wed" placeholder="Wednesday Meal" required />
+                              <Input name="thu" placeholder="Thursday Meal" />
+                              <Input name="fri" placeholder="Friday Meal" />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <DialogFooter>
-                        <Button type="submit" disabled={isSubmitting} className="w-full bg-orange-600">
-                          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Save Terminal Plan
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                        <DialogFooter>
+                          <Button type="submit" disabled={isSubmitting} className="w-full bg-orange-600">
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Save Terminal Plan
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
 
-              {loading ? (
+              {plansLoading ? (
                 <div className="py-20 flex flex-col items-center justify-center gap-3">
                   <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
                   <p className="text-xs text-gray-400 italic">Syncing kitchen records...</p>
@@ -210,9 +265,11 @@ export default function MealsCateringPage() {
                           </div>
                         ))}
                       </div>
-                      <div className="px-3 py-2 bg-gray-50 flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleDelete(plan.id)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-rose-600 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
+                      {isAdmin && (
+                        <div className="px-3 py-2 bg-gray-50 flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleDelete(plan.id)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-rose-600 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -223,9 +280,110 @@ export default function MealsCateringPage() {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="subscriptions" className="m-0">
+              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-gray-50 border-b text-gray-500 font-bold uppercase tracking-tighter">
+                    <tr>
+                      <th className="px-4 py-4">Pupil</th>
+                      <th className="px-4 py-4">Grade</th>
+                      <th className="px-4 py-4">Subscription</th>
+                      <th className="px-4 py-4">Dietary Notes</th>
+                      <th className="px-4 py-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {studentsLoading ? (
+                      <tr><td colSpan={5} className="py-20 text-center"><Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto" /></td></tr>
+                    ) : filteredStudents.map((student) => (
+                      <tr key={student.id} className="hover:bg-gray-50/50 group transition-colors">
+                        <td className="px-4 py-4 font-bold text-gray-800">{student.studentName}</td>
+                        <td className="px-4 py-4">
+                          <span className="px-2 py-0.5 bg-gray-100 rounded text-[9px] font-bold uppercase text-gray-600">{student.grade}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            {student.isCateringSubscribed ? (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                <CheckCircle2 className="h-3 w-3" /> Subscribed
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                                <XCircle className="h-3 w-3" /> Unsubscribed
+                              </span>
+                            )}
+                            {isAdmin && (
+                              <Checkbox 
+                                checked={student.isCateringSubscribed} 
+                                onCheckedChange={() => toggleSubscription(student)}
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          {student.dietaryRequirements ? (
+                            <div className="flex items-center gap-1.5 text-rose-600 font-bold">
+                              <CircleAlert className="h-3 w-3" />
+                              <p className="truncate max-w-[150px]">{student.dietaryRequirements}</p>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 italic text-[10px]">None recorded</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setDietaryNotes(student.dietaryRequirements || '');
+                              setIsDietaryOpen(true);
+                            }}
+                            className="h-8 text-[10px] font-bold gap-1 text-orange-600 hover:bg-orange-50"
+                          >
+                            <FileText className="h-3 w-3" /> Edit Notes
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
           </div>
         </Tabs>
       </div>
+
+      {/* Dietary Notes Dialog */}
+      <Dialog open={isDietaryOpen} onOpenChange={setIsDietaryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Dietary Profile</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="p-3 bg-orange-50 rounded-xl">
+              <p className="text-[10px] font-bold text-orange-700 uppercase mb-1">Student</p>
+              <p className="text-xs font-bold text-gray-800">{selectedStudent?.studentName}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Dietary Requirements & Allergies</Label>
+              <Input 
+                value={dietaryNotes} 
+                onChange={(e) => setDietaryNotes(e.target.value)} 
+                placeholder="e.g. Nut Allergy, No Shellfish, Vegetarian"
+              />
+              <p className="text-[10px] text-gray-400 italic">These notes will be highlighted to the kitchen staff.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button disabled={isSubmitting} onClick={handleSaveDietary} className="w-full bg-orange-600">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Update Wellness Record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

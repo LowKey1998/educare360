@@ -24,6 +24,8 @@ export interface Student {
   attendanceRate: number;
   status: string;
   marks?: Record<string, number>;
+  isCateringSubscribed?: boolean;
+  dietaryRequirements?: string;
   lastAcademicUpdate?: any;
   lastBillingTerm?: string;
   lastBillingDate?: any;

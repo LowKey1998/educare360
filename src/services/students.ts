@@ -70,5 +70,25 @@ export const studentService = {
     });
 
     return update(ref(db), updates);
+  },
+
+  /**
+   * Updates student catering subscription status.
+   */
+  async updateCateringStatus(db: Database, studentId: string, subscribed: boolean) {
+    return update(ref(db, `students/${studentId}`), {
+      isCateringSubscribed: subscribed,
+      lastRegistryUpdate: serverTimestamp()
+    });
+  },
+
+  /**
+   * Updates student dietary requirements.
+   */
+  async updateDietaryNotes(db: Database, studentId: string, notes: string) {
+    return update(ref(db, `students/${studentId}`), {
+      dietaryRequirements: notes,
+      lastRegistryUpdate: serverTimestamp()
+    });
   }
 };
