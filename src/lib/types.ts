@@ -25,6 +25,7 @@ export interface Student {
   status: string;
   marks?: Record<string, number>;
   lastAcademicUpdate?: any;
+  createdAt?: any;
 }
 
 export interface Admission {
@@ -59,6 +60,7 @@ export interface School {
   plan: string;
   status: string;
   revenue?: string;
+  createdAt?: any;
 }
 
 export interface Classroom {
@@ -68,6 +70,7 @@ export interface Classroom {
   location: string;
   capacity: number;
   status: string;
+  createdAt?: any;
 }
 
 export interface Lesson {
@@ -78,6 +81,7 @@ export interface Lesson {
   room: string;
   day: string;
   period: string;
+  createdAt?: any;
 }
 
 export interface MealPlan {
@@ -86,6 +90,7 @@ export interface MealPlan {
   status: string;
   dateRange: string;
   schedule: Array<{ day: string; meal: string }>;
+  createdAt?: any;
 }
 
 export interface HealthRecord {
@@ -112,6 +117,7 @@ export interface Asset {
   cost: number;
   custodian?: string;
   status: string;
+  createdAt?: any;
 }
 
 export interface Announcement {
@@ -133,4 +139,5 @@ export interface SystemSettings {
   address: string;
   logoUrl: string;
   primaryColor: string;
+  updatedAt?: any;
 }
