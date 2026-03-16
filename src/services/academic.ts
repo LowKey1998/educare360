@@ -1,6 +1,6 @@
 
 import { Database, ref, push, remove, update, serverTimestamp } from 'firebase/database';
-import { Classroom, Lesson } from '@/lib/types';
+import { Classroom, Lesson, LessonPlan, Exam } from '@/lib/types';
 
 export const academicService = {
   async saveMarks(db: Database, subject: string, marks: Record<string, number>) {
@@ -13,24 +13,51 @@ export const academicService = {
     });
     return update(ref(db), updates);
   },
+
   async addClassroom(db: Database, data: Omit<Classroom, 'id' | 'createdAt'>) {
     return push(ref(db, 'classrooms'), {
       ...data,
       createdAt: serverTimestamp()
     });
   },
+
   async deleteClassroom(db: Database, id: string) {
     return remove(ref(db, `classrooms/${id}`));
   },
+
   async scheduleLesson(db: Database, data: Omit<Lesson, 'id' | 'createdAt'>) {
     return push(ref(db, 'timetable'), {
       ...data,
       createdAt: serverTimestamp()
     });
   },
+
   async deleteLesson(db: Database, id: string) {
     return remove(ref(db, `timetable/${id}`));
   },
+
+  async addLessonPlan(db: Database, data: Omit<LessonPlan, 'id' | 'createdAt'>) {
+    return push(ref(db, 'lesson_plans'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  },
+
+  async deleteLessonPlan(db: Database, id: string) {
+    return remove(ref(db, `lesson_plans/${id}`));
+  },
+
+  async addExam(db: Database, data: Omit<Exam, 'id' | 'createdAt'>) {
+    return push(ref(db, 'exams'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  },
+
+  async deleteExam(db: Database, id: string) {
+    return remove(ref(db, `exams/${id}`));
+  },
+
   async logECD(db: Database, data: any) {
     return push(ref(db, 'ecd_observations'), {
       ...data,

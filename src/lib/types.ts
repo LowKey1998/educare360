@@ -66,7 +66,8 @@ export interface School {
 export interface Classroom {
   id: string;
   name: string;
-  teacher: string;
+  teacherId: string;
+  teacherName: string;
   location: string;
   capacity: number;
   status: string;
@@ -77,11 +78,39 @@ export interface Lesson {
   id: string;
   grade: string;
   subject: string;
-  teacher: string;
+  teacherId: string;
+  teacherName: string;
   room: string;
   day: string;
   period: string;
+  startTime: string;
+  endTime: string;
   createdAt?: any;
+}
+
+export interface LessonPlan {
+  id: string;
+  grade: string;
+  subject: string;
+  teacherId: string;
+  teacherName: string;
+  topic: string;
+  objectives: string;
+  status: 'Draft' | 'Approved' | 'Completed';
+  createdAt: any;
+}
+
+export interface Exam {
+  id: string;
+  grade: string;
+  subject: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+  teacherId: string;
+  teacherName: string;
+  createdAt: any;
 }
 
 export interface MealPlan {
