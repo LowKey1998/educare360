@@ -43,5 +43,16 @@ export const studentService = {
       status, 
       lastUpdated: serverTimestamp() 
     });
+  },
+
+  /**
+   * Updates the parent contact email for a specific student.
+   * This handles portal linking and communication.
+   */
+  async updateParentEmail(db: Database, studentId: string, email: string) {
+    return update(ref(db, `students/${studentId}`), {
+      parentEmail: email.toLowerCase().trim(),
+      lastRegistryUpdate: serverTimestamp()
+    });
   }
 };

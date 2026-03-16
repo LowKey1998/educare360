@@ -15,17 +15,49 @@ import {
   Database,
   ArrowRight,
   TrendingUp,
-  Award
+  Award,
+  Users,
+  Mail,
+  UserPlus,
+  Search,
+  Edit2,
+  CheckCircle2,
+  ShieldCheck,
+  MoreHorizontal
 } from 'lucide-react';
 import { useUserProfile, useDatabase, useRTDBCollection } from '@/firebase';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { studentService } from '@/services/students';
+import { Student, UserProfile } from '@/lib/types';
 
 export default function ParentPortalPage() {
-  const { profile } = useUserProfile();
+  const { profile, loading: profileLoading } = useUserProfile();
   const database = useDatabase();
-  const { data: students, loading: studentsLoading } = useRTDBCollection(database, 'students');
+  const { toast } = useToast();
+  
+  const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
+  const { data: users, loading: usersLoading } = useRTDBCollection<UserProfile>(database, 'users');
   const { data: announcements, loading: msgsLoading } = useRTDBCollection(database, 'announcements');
   
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [isEditEmailOpen, setIsEditEditEmailOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [newEmail, setNewEmail] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
 
   const myChildren = useMemo(() => {
     if (!students || !profile?.email) return [];
@@ -37,15 +69,191 @@ export default function ParentPortalPage() {
     return myChildren[0];
   }, [myChildren, selectedChildId]);
 
-  if (studentsLoading) {
+  // Admin Logic: Cross-reference student parent emails with registered users
+  const familyManagementData = useMemo(() => {
+    if (!isAdmin || !students) return [];
+    
+    const uniqueParentEmails = Array.from(new Set(students.map(s => s.parentEmail?.toLowerCase()).filter(Boolean)));
+    
+    return uniqueParentEmails.map(email => {
+      const account = users.find(u => u.email?.toLowerCase() === email && u.role === 'parent');
+      const linkedStudents = students.filter(s => s.parentEmail?.toLowerCase() === email);
+      
+      return {
+        email,
+        accountExists: !!account,
+        displayName: account?.displayName || linkedStudents[0]?.guardianName || 'Unknown Parent',
+        students: linkedStudents,
+        userId: account?.uid
+      };
+    }).filter(f => 
+      f.email.includes(search.toLowerCase()) || 
+      f.displayName.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [students, users, isAdmin, search]);
+
+  const handleUpdateEmail = async () => {
+    if (!editingStudent || !newEmail) return;
+    setIsUpdating(true);
+    try {
+      await studentService.updateParentEmail(database, editingStudent.id, newEmail);
+      setIsEditEditEmailOpen(false);
+      setEditingStudent(null);
+      toast({ title: "Email Updated", description: "Parent contact record synchronized." });
+    } catch (e) {
+      toast({ title: "Update Failed", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (studentsLoading || profileLoading || usersLoading) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-rose-600" />
-        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Linking Family Profiles...</p>
+        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Synchronizing Family Registry...</p>
       </div>
     );
   }
 
+  // Admin View
+  if (isAdmin) {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-gradient-to-r from-rose-600 via-rose-500 to-pink-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
+              <Users className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Family & Parent Portal Registry</h2>
+              <p className="text-sm text-white/80 mt-1">Manage portal access, verify registrations, and update parent contacts</p>
+            </div>
+            <div className="ml-auto flex items-center gap-3">
+              <div className="hidden md:flex px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
+                <Database className="w-3.5 h-3.5" /> Registry Live
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <AdminStatCard label="Total Families" value={familyManagementData.length.toString()} icon={<Users className="h-4 w-4" />} color="bg-rose-50 text-rose-600" />
+          <AdminStatCard label="Registered Accounts" value={familyManagementData.filter(f => f.accountExists).length.toString()} icon={<ShieldCheck className="h-4 w-4" />} color="bg-emerald-50 text-emerald-600" />
+          <AdminStatCard label="Pending Registration" value={familyManagementData.filter(f => !f.accountExists).length.toString()} icon={<UserPlus className="h-4 w-4" />} color="bg-amber-50 text-amber-600" />
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <Input 
+                className="pl-9 text-xs h-9" 
+                placeholder="Search families by name or email..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Monitoring {familyManagementData.length} families</p>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {familyManagementData.length > 0 ? familyManagementData.map((family) => (
+              <div key={family.email} className="p-4 hover:bg-gray-50/50 transition-all flex flex-col lg:flex-row lg:items-center gap-4">
+                <div className="flex items-center gap-3 min-w-[250px]">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${family.accountExists ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
+                    {family.displayName[0]}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-800">{family.displayName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-gray-400 font-medium">{family.email}</p>
+                      {family.accountExists ? (
+                        <span className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
+                          <CheckCircle2 className="h-2 w-2" /> PORTAL ACTIVE
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[8px] font-bold text-amber-600 bg-amber-50 px-1 rounded">
+                          <AlertCircle className="h-2 w-2" /> NO ACCOUNT
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex flex-wrap gap-2">
+                  {family.students.map(s => (
+                    <div key={s.id} className="flex items-center gap-2 px-2 py-1 bg-white border border-gray-100 rounded-lg group shadow-sm">
+                      <div className="text-[10px]">
+                        <span className="font-bold text-gray-700">{s.studentName}</span>
+                        <span className="text-[9px] text-gray-400 ml-1.5 font-bold uppercase">{s.grade}</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setEditingStudent(s);
+                          setNewEmail(s.parentEmail);
+                          setIsEditEditEmailOpen(true);
+                        }}
+                        className="p-1 text-gray-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Edit2 className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  {!family.accountExists && (
+                    <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold gap-1 border-rose-100 text-rose-600 hover:bg-rose-50">
+                      <Mail className="h-3 w-3" /> Resend Invite
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-300"><MoreHorizontal className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            )) : (
+              <div className="py-20 text-center text-gray-400 text-xs italic">No matching families found.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Edit Email Dialog */}
+        <Dialog open={isEditEmailOpen} onOpenChange={setIsEditEditEmailOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Parent Contact Email</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl">
+                <p className="text-[10px] font-bold text-rose-700 uppercase mb-1">Student Record</p>
+                <p className="text-xs font-bold text-gray-800">{editingStudent?.studentName} ({editingStudent?.grade})</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Parent Email Address</Label>
+                <Input 
+                  type="email" 
+                  value={newEmail} 
+                  onChange={(e) => setNewEmail(e.target.value)} 
+                  placeholder="parent@example.com"
+                />
+                <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                  Changing this email will update the contact details used for portal linking and automated notifications.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button disabled={isUpdating} onClick={handleUpdateEmail} className="w-full bg-rose-600 hover:bg-rose-700 font-bold">
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Synchronize Records
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Parent View
   if (myChildren.length === 0) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4 max-w-md mx-auto text-center">
@@ -112,7 +320,7 @@ export default function ParentPortalPage() {
         <ParentMetricCard icon={<Award className="w-4 h-4 text-rose-600" />} label="Subjects Graded" value={activeChild?.marks ? Object.keys(activeChild.marks).length.toString() : '0'} color="bg-rose-50" />
         <ParentMetricCard icon={<TrendingUp className="w-4 h-4 text-emerald-600" />} label="Attendance Rate" value={`${activeChild?.attendanceRate || 0}%`} color="bg-emerald-50" />
         <ParentMetricCard icon={<DollarSign className="w-4 h-4 text-amber-600" />} label="Fee Balance" value={`$${activeChild?.feeBalance || 0}`} color="bg-amber-50" 
-          valueColor={parseFloat(activeChild?.feeBalance) > 0 ? "text-rose-600" : "text-emerald-600"} />
+          valueColor={parseFloat(activeChild?.feeBalance as any) > 0 ? "text-rose-600" : "text-emerald-600"} />
         <ParentMetricCard icon={<MessageSquare className="w-4 h-4 text-blue-600" />} label="Updates" value={msgsLoading ? '...' : announcements.length.toString()} color="bg-blue-50" />
       </div>
 
@@ -193,6 +401,19 @@ function ParentMetricCard({ icon, label, value, color, valueColor = "text-gray-8
       </div>
       <p className={`text-xl font-bold ${valueColor}`}>{value}</p>
       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+function AdminStatCard({ icon, label, value, color }: any) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all group">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform`}>{icon}</div>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Registry</span>
+      </div>
+      <p className="text-2xl font-bold text-gray-800">{value}</p>
+      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">{label}</p>
     </div>
   );
 }
