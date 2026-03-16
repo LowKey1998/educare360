@@ -1,13 +1,13 @@
 
 import { Database, ref, push, remove, update, serverTimestamp } from 'firebase/database';
-import { Classroom, Lesson, LessonPlan, Exam, PeriodStructure } from '@/lib/types';
+import { Classroom, Lesson, LessonPlan, Exam, PeriodStructure, Subject } from '@/lib/types';
 
 export const academicService = {
-  async saveMarks(db: Database, subject: string, marks: Record<string, number>) {
+  async saveMarks(db: Database, subjectCode: string, marks: Record<string, number>) {
     const updates: any = {};
     Object.entries(marks).forEach(([studentId, score]) => {
       if (!isNaN(score)) {
-        updates[`students/${studentId}/marks/${subject}`] = score;
+        updates[`students/${studentId}/marks/${subjectCode}`] = score;
         updates[`students/${studentId}/lastAcademicUpdate`] = serverTimestamp();
       }
     });
@@ -74,5 +74,16 @@ export const academicService = {
 
   async deletePeriodStructure(db: Database, id: string) {
     return remove(ref(db, `period_structures/${id}`));
+  },
+
+  async addSubject(db: Database, data: Omit<Subject, 'id' | 'createdAt'>) {
+    return push(ref(db, 'subjects'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  },
+
+  async deleteSubject(db: Database, id: string) {
+    return remove(ref(db, `subjects/${id}`));
   }
 };

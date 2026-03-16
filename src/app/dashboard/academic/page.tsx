@@ -10,7 +10,10 @@ import {
   Trophy, 
   Database, 
   TrendingUp, 
-  FileText 
+  FileText,
+  Plus,
+  Trash2,
+  Library
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -34,11 +37,20 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useDatabase, useRTDBCollection } from '@/firebase';
+import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
 import { academicService } from '@/services/academic';
-import { Student } from '@/lib/types';
+import { Student, Subject } from '@/lib/types';
 
 const trendData = [
   { name: 'T1 2025', grade4: 68, grade5: 72, grade6: 75, grade7: 70 },
@@ -49,13 +61,18 @@ const trendData = [
 
 export default function AcademicManagementPage() {
   const [activeGrade, setActiveGrade] = useState('Grade 5');
-  const [activeSubject, setActiveSubject] = useState('ENG');
+  const [activeSubject, setActiveSubject] = useState('');
   const [marks, setMarks] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
   
   const database = useDatabase();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
-  const { data: students, loading } = useRTDBCollection<Student>(database, 'students');
+  const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
+  const { data: subjects, loading: subjectsLoading } = useRTDBCollection<Subject>(database, 'subjects');
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => s.grade === activeGrade);
@@ -90,10 +107,11 @@ export default function AcademicManagementPage() {
   }, [filteredStudents]);
 
   const handleSaveMarks = async () => {
+    if (!activeSubject) return;
     setIsSaving(true);
     try {
       await academicService.saveMarks(database, activeSubject, marks);
-      toast({ title: "Marks Saved", description: `Updated ${Object.keys(marks).length} records for ${activeSubject}.` });
+      toast({ title: "Marks Saved", description: `Updated ${Object.keys(marks).length} records.` });
       setMarks({});
     } catch (e) {
       toast({ title: "Error", description: "Failed to save marks.", variant: "destructive" });
@@ -102,14 +120,34 @@ export default function AcademicManagementPage() {
     }
   };
 
+  const handleAddSubject = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSaving(true);
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name') as string,
+      code: formData.get('code') as string,
+    };
+
+    try {
+      await academicService.addSubject(database, data);
+      setIsAddSubjectOpen(false);
+      toast({ title: "Subject Registered" });
+    } catch (e) {
+      toast({ title: "Error", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const subjectData = useMemo(() => {
-    const subjects = ['ENG', 'MAT', 'SHO', 'SCI', 'SOC', 'ICT'];
+    if (subjects.length === 0) return [];
     return subjects.map(sub => {
-      const scores = filteredStudents.map(s => s.marks?.[sub]).filter(v => v !== undefined);
+      const scores = filteredStudents.map(s => s.marks?.[sub.code]).filter(v => v !== undefined);
       const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-      return { name: sub, Average: Math.round(avg) };
+      return { name: sub.code, Average: Math.round(avg) };
     });
-  }, [filteredStudents]);
+  }, [filteredStudents, subjects]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -156,6 +194,7 @@ export default function AcademicManagementPage() {
             <TabsList className="bg-transparent h-auto p-0 gap-4">
               <TabsTrigger value="performance" className="px-4 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-600 rounded-none shadow-none bg-transparent">Performance Overview</TabsTrigger>
               <TabsTrigger value="marks" className="px-4 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-600 rounded-none shadow-none bg-transparent">Marks Entry</TabsTrigger>
+              {isAdmin && <TabsTrigger value="subjects" className="px-4 py-3 text-xs font-bold uppercase tracking-tight border-b-2 border-transparent data-[state=active]:border-teal-600 data-[state=active]:text-teal-600 rounded-none shadow-none bg-transparent">Subject Registry</TabsTrigger>}
             </TabsList>
           </div>
 
@@ -180,15 +219,19 @@ export default function AcademicManagementPage() {
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-gray-800">Subject-wise Average ({activeGrade})</h4>
                 <div className="h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={subjectData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
-                      <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '11px' }} />
-                      <Bar dataKey="Average" fill="#0D9488" radius={[4, 4, 0, 0]} barSize={12} name="Average Score" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {subjects.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={subjectData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} />
+                        <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '11px' }} />
+                        <Bar dataKey="Average" fill="#0D9488" radius={[4, 4, 0, 0]} barSize={12} name="Average Score" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-xs text-gray-400 italic">No subjects registered to analyze.</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -199,28 +242,25 @@ export default function AcademicManagementPage() {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Select value={activeSubject} onValueChange={setActiveSubject}>
-                    <SelectTrigger className="w-[160px] h-9 text-xs">
-                      <SelectValue />
+                    <SelectTrigger className="w-[180px] h-9 text-xs">
+                      <SelectValue placeholder="Select Subject..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ENG">English</SelectItem>
-                      <SelectItem value="MAT">Mathematics</SelectItem>
-                      <SelectItem value="SHO">Shona</SelectItem>
-                      <SelectItem value="SCI">Science</SelectItem>
-                      <SelectItem value="SOC">Social Studies</SelectItem>
-                      <SelectItem value="ICT">ICT</SelectItem>
+                      {subjects.map(s => (
+                        <SelectItem key={s.id} value={s.code}>{s.name} ({s.code})</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-gray-400 italic font-medium uppercase tracking-widest">Entering Term 1 Marks</p>
                 </div>
-                <Button onClick={handleSaveMarks} disabled={isSaving || Object.keys(marks).length === 0} size="sm" className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700">
+                <Button onClick={handleSaveMarks} disabled={isSaving || Object.keys(marks).length === 0 || !activeSubject} size="sm" className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700">
                   {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   Post All Marks
                 </Button>
               </div>
 
               <div className="border border-gray-100 rounded-xl overflow-hidden">
-                {loading ? (
+                {studentsLoading ? (
                   <div className="p-12 text-center text-xs text-gray-400 italic">Syncing student list...</div>
                 ) : filteredStudents.length > 0 ? (
                   <table className="w-full text-xs">
@@ -239,7 +279,7 @@ export default function AcademicManagementPage() {
                             <div className="text-[9px] text-gray-400 font-mono">{s.admissionNo}</div>
                           </td>
                           <td className="px-4 py-3 text-gray-400">
-                            {s.marks?.[activeSubject] !== undefined ? (
+                            {activeSubject && s.marks?.[activeSubject] !== undefined ? (
                               <span className="bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-bold">
                                 Current: {s.marks[activeSubject]}%
                               </span>
@@ -264,6 +304,66 @@ export default function AcademicManagementPage() {
                   </table>
                 ) : (
                   <div className="p-12 text-center text-xs text-gray-400 italic">No students enrolled in {activeGrade}</div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="subjects" className="p-5 mt-0 outline-none">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800">Institutional Curriculum</h3>
+                  <p className="text-[10px] text-gray-400">Manage global subjects offered by the school.</p>
+                </div>
+                <Dialog open={isAddSubjectOpen} onOpenChange={setIsAddSubjectOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="h-9 gap-1.5 bg-teal-600 font-bold">
+                      <Plus className="h-3.5 w-3.5" /> Add Subject
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <form onSubmit={handleAddSubject}>
+                      <DialogHeader><DialogTitle>Register New Subject</DialogTitle></DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Subject Name</Label>
+                          <Input name="name" placeholder="e.g. Mathematics" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Subject Code</Label>
+                          <Input name="code" placeholder="e.g. MAT" required />
+                        </div>
+                      </div>
+                      <DialogFooter><Button type="submit" className="w-full bg-teal-600">Save Subject</Button></DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {subjectsLoading ? (
+                  <div className="col-span-full py-12 text-center text-xs text-gray-400 italic">Loading registry...</div>
+                ) : subjects.length > 0 ? subjects.map(sub => (
+                  <div key={sub.id} className="p-4 bg-white border rounded-xl flex items-center justify-between group hover:shadow-md transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
+                        <Library className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-800">{sub.name}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">{sub.code}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => academicService.deleteSubject(database, sub.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )) : (
+                  <div className="col-span-full py-12 text-center text-xs text-gray-400 italic border-2 border-dashed rounded-xl">No subjects registered.</div>
                 )}
               </div>
             </div>

@@ -37,9 +37,8 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { academicService } from '@/services/academic';
-import { Lesson, Exam, Student, UserProfile, Classroom, PeriodStructure } from '@/lib/types';
+import { Lesson, Exam, Student, UserProfile, Classroom, PeriodStructure, Subject } from '@/lib/types';
 
-const SUBJECTS = ['Mathematics', 'English', 'Shona', 'Science', 'Social Studies', 'ICT'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 export default function TimetableCalendarPage() {
@@ -63,6 +62,7 @@ export default function TimetableCalendarPage() {
   const { data: periods, loading: periodsLoading } = useRTDBCollection<PeriodStructure>(database, 'period_structures');
   const { data: users } = useRTDBCollection<UserProfile>(database, 'users');
   const { data: classrooms } = useRTDBCollection<Classroom>(database, 'classrooms');
+  const { data: subjects } = useRTDBCollection<Subject>(database, 'subjects');
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const teachers = useMemo(() => users.filter(u => u.role === 'staff' || u.role === 'admin'), [users]);
@@ -185,9 +185,11 @@ export default function TimetableCalendarPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Subject</Label>
-                              <Select name="subject" defaultValue="Mathematics">
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>{SUBJECTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                              <Select name="subject" required>
+                                <SelectTrigger><SelectValue placeholder="Choose subject..." /></SelectTrigger>
+                                <SelectContent>
+                                  {subjects.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                                </SelectContent>
                               </Select>
                             </div>
                             <div className="space-y-2">
@@ -204,7 +206,9 @@ export default function TimetableCalendarPage() {
                               <SelectTrigger><SelectValue placeholder="Select Period..." /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="manual">Manual Entry</SelectItem>
-                                {periods.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.startTime} - {p.endTime})</SelectItem>)}
+                                {periods.map(p => (
+                                  <SelectItem key={p.id} value={p.id}>{p.name} ({p.startTime} - {p.endTime})</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <div className="grid grid-cols-3 gap-4">

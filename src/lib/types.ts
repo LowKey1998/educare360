@@ -68,6 +68,13 @@ export interface School {
   createdAt?: any;
 }
 
+export interface Subject {
+  id: string;
+  name: string;
+  code: string;
+  createdAt?: any;
+}
+
 export interface Classroom {
   id: string;
   name: string;
