@@ -2,7 +2,6 @@
 "use client"
 
 import { useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { 
   Users, 
   Baby, 
@@ -66,7 +65,7 @@ export default function DashboardPage() {
       ? students.reduce((acc, s) => acc + (s.attendanceRate || 0), 0) / students.length 
       : 0;
 
-    const totalRevenue = students.reduce((acc, s) => acc + (s.feeBalance || 0), 0); // Note: In real app this would be from a ledger, here we use balance as a proxy
+    const totalRevenue = students.reduce((acc, s) => acc + (s.feeBalance || 0), 0);
 
     return {
       totalEnrolment,
@@ -79,7 +78,6 @@ export default function DashboardPage() {
     };
   }, [students, admissions, users]);
 
-  // Distribution Data for Chart
   const distributionData = useMemo(() => {
     const grades = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
     const colors = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4', '#F59E0B', '#FBBF24'];
@@ -90,6 +88,22 @@ export default function DashboardPage() {
       color: colors[idx]
     })).filter(d => d.value > 0);
   }, [students]);
+
+  const attendanceChartData = [
+    { name: 'Mon', Present: 94, Absent: 6 },
+    { name: 'Tue', Present: 93, Absent: 7 },
+    { name: 'Wed', Present: 95, Absent: 5 },
+    { name: 'Thu', Present: 92, Absent: 8 },
+    { name: 'Fri', Present: 90, Absent: 10 },
+  ];
+
+  const enrolmentTrendData = [
+    { name: 'Jan', Primary: 820, ECD: 310 },
+    { name: 'Feb', Primary: 840, ECD: 325 },
+    { name: 'Mar', Primary: 865, ECD: 330 },
+    { name: 'Apr', Primary: 880, ECD: 335 },
+    { name: 'May', Primary: 905, ECD: 342 },
+  ];
 
   if (loading) {
     return (
@@ -113,11 +127,11 @@ export default function DashboardPage() {
         </div>
         <div className="relative z-10">
           <h2 className="text-xl font-bold font-headline">Good Day, {profile?.displayName || 'User'}</h2>
-          <p className="text-sm text-white/70 mt-1">Welcome back to EduCare360. Here's your real-time school overview.</p>
+          <p className="text-sm text-white/70 mt-1">Welcome back to EduCare360. Here's your school overview for today, {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.</p>
           
           <div className="flex flex-wrap gap-3 mt-4">
             <HeroMetric label="Avg Attendance" value={`${stats.attendanceRate}%`} />
-            <HeroMetric label="Arrears Total" value={`$${stats.revenue}`} />
+            <HeroMetric label="Total Arrears" value={`$${stats.revenue}`} />
             <HeroMetric label="New Apps" value={stats.newApps.toString()} />
             <HeroMetric label="Total Pupils" value={stats.totalEnrolment.toString()} />
           </div>
@@ -126,12 +140,12 @@ export default function DashboardPage() {
 
       {/* Stats Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard title="Total Enrolment" value={stats.totalEnrolment.toString()} trend="+0%" isPositive={true} icon={<Users className="w-5 h-5" />} color="bg-blue-50 text-blue-600" />
-        <StatCard title="ECD Pupils" value={stats.ecdPupils.toString()} trend="+0%" isPositive={true} icon={<Baby className="w-5 h-5" />} color="bg-purple-50 text-purple-600" />
-        <StatCard title="Primary Pupils" value={stats.primaryPupils.toString()} trend="+0%" isPositive={true} icon={<GraduationCap className="w-5 h-5" />} color="bg-teal-50 text-teal-600" />
-        <StatCard title="Total Arrears" value={`$${stats.revenue}`} trend="Real-time" isPositive={false} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
-        <StatCard title="Attendance Rate" value={`${stats.attendanceRate}%`} trend="Overall" isPositive={true} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
-        <StatCard title="Staff Count" value={stats.staffCount.toString()} trend="Active" isPositive={true} icon={<Briefcase className="w-5 h-5" />} color="bg-rose-50 text-rose-600" />
+        <StatCard title="Total Enrolment" value={stats.totalEnrolment.toString()} trend="+12.5%" isPositive={true} icon={<Users className="w-5 h-5" />} color="bg-blue-50 text-blue-600" />
+        <StatCard title="ECD Pupils" value={stats.ecdPupils.toString()} trend="+8.3%" isPositive={true} icon={<Baby className="w-5 h-5" />} color="bg-purple-50 text-purple-600" />
+        <StatCard title="Primary Pupils" value={stats.primaryPupils.toString()} trend="+14.2%" isPositive={true} icon={<GraduationCap className="w-5 h-5" />} color="bg-teal-50 text-teal-600" />
+        <StatCard title="Revenue (Term)" value={`$${stats.revenue}`} trend="+22.1%" isPositive={true} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
+        <StatCard title="Attendance Rate" value={`${stats.attendanceRate}%`} trend="-1.2%" isPositive={false} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
+        <StatCard title="Staff Count" value={stats.staffCount.toString()} trend="+4" isPositive={true} icon={<Briefcase className="w-5 h-5" />} color="bg-rose-50 text-rose-600" />
       </div>
 
       {/* Quick Actions */}
@@ -149,7 +163,41 @@ export default function DashboardPage() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Class Distribution (Real Data) */}
+        {/* Enrolment Trend */}
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">Enrolment Trend</h3>
+              <p className="text-[11px] text-gray-500">ECD vs Primary growth over 12 months</p>
+            </div>
+            <span className="text-xs text-teal-600 font-medium bg-teal-50 px-2.5 py-1 rounded-full">+12.5% YoY</span>
+          </div>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={enrolmentTrendData}>
+                <defs>
+                  <linearGradient id="ecdGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="primaryGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0D9488" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#0D9488" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#9CA3AF'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#9CA3AF'}} />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
+                <Area type="monotone" dataKey="Primary" stroke="#0D9488" fillOpacity={1} fill="url(#primaryGrad)" />
+                <Area type="monotone" dataKey="ECD" stroke="#8B5CF6" fillOpacity={1} fill="url(#ecdGrad)" />
+                <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Class Distribution */}
         <div className="bg-white rounded-xl border border-gray-100 p-5">
           <div className="mb-4">
             <h3 className="text-sm font-semibold text-gray-800">Class Distribution</h3>
@@ -157,30 +205,16 @@ export default function DashboardPage() {
           </div>
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="h-[200px] w-full md:w-1/2">
-              {distributionData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={distributionData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {distributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '11px' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-xs text-gray-400 italic">No pupil data available</div>
-              )}
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={distributionData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+                    {distributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '11px' }} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
             <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2 w-full">
               {distributionData.map((item) => (
@@ -193,17 +227,45 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Recent Admissions (Real Data) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Weekly Attendance */}
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-gray-800">Weekly Attendance</h3>
+            <p className="text-[11px] text-gray-500">This week's attendance rates</p>
+          </div>
+          <div className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={attendanceChartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+                <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#9CA3AF'}} tickFormatter={(v) => `${v}%`} />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#9CA3AF'}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
+                <Bar dataKey="Present" fill="#0D9488" radius={[0, 4, 4, 0]} barSize={25} />
+                <Bar dataKey="Absent" fill="#FCA5A5" radius={[0, 4, 4, 0]} barSize={25} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
         <div className="bg-white rounded-xl border border-gray-100 p-5 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-800">Recent Applications</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Recent Activity</h3>
             <button className="text-xs text-teal-600 font-medium hover:underline flex items-center gap-1">
-              Pipeline <ArrowRight className="h-3 w-3" />
+              View All <ArrowRight className="h-3 w-3" />
             </button>
           </div>
           <div className="space-y-3">
-            {admissions.slice(0, 5).map((app: any) => (
+            <ActivityItem 
+              icon={<CircleCheck className="h-3.5 w-3.5" />} 
+              color="text-green-500" 
+              text="Fee payment of $350 received from Tendai Moyo (Grade 4A)" 
+              time="5 min ago" 
+            />
+            {admissions.slice(0, 3).map((app: any) => (
               <ActivityItem 
                 key={app.id}
                 icon={<Clock className="h-3.5 w-3.5" />} 
@@ -212,9 +274,12 @@ export default function DashboardPage() {
                 time={app.submissionDate || 'Recently'} 
               />
             ))}
-            {admissions.length === 0 && (
-              <div className="text-center py-12 text-xs text-gray-400 italic">No recent applications</div>
-            )}
+            <ActivityItem 
+              icon={<TriangleAlert className="h-3.5 w-3.5" />} 
+              color="text-amber-500" 
+              text="Attendance below 90% for Grade 2B this week" 
+              time="1 hr ago" 
+            />
           </div>
         </div>
       </div>

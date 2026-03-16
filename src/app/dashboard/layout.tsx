@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useUserProfile, useAuth } from '@/firebase';
+import { useUserProfile, useAuth, useDatabase, useRTDBDoc } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { 
   LayoutDashboard, 
@@ -10,7 +10,6 @@ import {
   Settings, 
   LogOut, 
   Search,
-  HelpCircle,
   Bell,
   ChevronDown,
   Building2,
@@ -33,18 +32,18 @@ import {
   Brain,
   Globe,
   Menu,
-  ChevronsUpDown,
   UserCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
+  const database = useDatabase();
   const { profile, loading } = useUserProfile();
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -77,12 +76,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!profile) return null;
 
-  // Navigation logic based on roles
   const isAdmin = profile.role === 'admin';
-  const isStaff = profile.role === 'staff';
   const isParent = profile.role === 'parent';
 
-  // Navigation groups for Admin and Staff
   const adminNav = [
     {
       label: 'OVERVIEW',
@@ -153,7 +149,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   ];
 
-  // Navigation for Parents
   const parentNav = [
     {
       label: 'MY FAMILY',
@@ -193,28 +188,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   const currentNav = isParent ? parentNav : adminNav;
+  const schoolName = schoolSettings?.schoolName || 'Sunrise Academy';
 
   return (
     <div className="flex h-screen bg-[#F8F9FC] overflow-hidden">
-      {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <aside 
-        className={`${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed left-0 top-0 z-50 h-full w-64 bg-[#0F1A2E] flex flex-col border-r border-[#1E3A5F]/50 transition-transform duration-300 md:relative md:translate-x-0`}
-      >
+      <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed left-0 top-0 z-50 h-full w-64 bg-[#0F1A2E] flex flex-col border-r border-[#1E3A5F]/50 transition-transform duration-300 md:relative md:translate-x-0`}>
         <div className="p-4 border-b border-[#1E3A5F]/50">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">E</span>
+              <span className="text-white font-bold text-sm">{(schoolSettings?.shortName || 'E')[0]}</span>
             </div>
             <div className="min-w-0">
-              <h2 className="text-white font-semibold text-sm truncate">EduCare360</h2>
-              <p className="text-gray-500 text-xs truncate">Sunrise Academy</p>
+              <h2 className="text-white font-semibold text-sm truncate">{schoolName}</h2>
+              <p className="text-gray-500 text-[10px] truncate uppercase tracking-widest">{schoolSettings?.currentTerm || 'Term 1'} • {schoolSettings?.currentYear || '2026'}</p>
             </div>
           </div>
 
@@ -291,9 +281,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button 
@@ -303,19 +291,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="h-4.5 w-4.5" />
             </button>
             <div>
-              <h1 className="text-sm font-semibold text-gray-800">
-                {pathname.split('/').pop()?.replace(/-/g, ' ').toUpperCase() || 'DASHBOARD'}
+              <h1 className="text-sm font-semibold text-gray-800 uppercase tracking-tight">
+                {pathname.split('/').pop()?.replace(/-/g, ' ') || 'DASHBOARD'}
               </h1>
-              <p className="text-[10px] text-gray-400 capitalize">{profile.role} Access • Sunrise Academy</p>
+              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{profile.role} Access • {schoolName}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
               <Bell className="h-4.5 w-4.5" />
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-medium border border-white">
-                {isParent ? '2' : '4'}
-              </span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
             </button>
             <div className="flex items-center gap-2 ml-4 border-l border-gray-100 pl-4">
               <div className="text-right hidden sm:block">
@@ -327,7 +313,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar bg-[#F8F9FC]">
           {children}
         </main>
