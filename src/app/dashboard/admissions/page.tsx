@@ -173,6 +173,13 @@ export default function AdmissionsPage() {
     }
   };
 
+  // Suggest an admission number: CURRENT_YEAR-XXX
+  const suggestedAdmNo = useMemo(() => {
+    const year = new Date().getFullYear();
+    const random = Math.floor(100 + Math.random() * 899);
+    return `${year}-${random}`;
+  }, [isEnrollOpen]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
@@ -306,7 +313,7 @@ export default function AdmissionsPage() {
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl mb-2">
-                <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Application Summary</p>
+                <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Application Summary (Auto-filled)</p>
                 <div className="flex justify-between text-xs">
                   <span className="font-bold text-gray-700">{selectedApp?.studentName}</span>
                   <span className="text-blue-600 font-bold">{selectedApp?.grade}</span>
@@ -316,7 +323,7 @@ export default function AdmissionsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Admission Number</Label>
-                  <Input name="admNo" placeholder="e.g. 2026-001" required />
+                  <Input name="admNo" defaultValue={suggestedAdmNo} placeholder="e.g. 2026-001" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Gender</Label>
@@ -410,7 +417,7 @@ function ApplicationCard({ app, isAdmin, onUpdateStatus, onDelete, onEnroll }: a
           )}
           {isAdmin && (
             <button onClick={() => onDelete(app.id)} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors">
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
