@@ -22,7 +22,8 @@ import {
   Edit2,
   CheckCircle2,
   ShieldCheck,
-  MoreHorizontal
+  MoreHorizontal,
+  UserCheck
 } from 'lucide-react';
 import { useUserProfile, useDatabase, useRTDBCollection } from '@/firebase';
 import { 
@@ -68,24 +69,45 @@ export default function ParentPortalPage() {
     return myChildren[0];
   }, [myChildren, selectedChildId]);
 
-  // Admin Logic: Cross-reference student parent emails with registered users
+  /**
+   * Admin Logic: Merges registered accounts and registry emails
+   */
   const familyManagementData = useMemo(() => {
-    if (!isAdmin || !students) return [];
+    if (!isAdmin || !students || !users) return [];
     
-    const uniqueParentEmails = Array.from(new Set(students.map(s => s.parentEmail?.toLowerCase()).filter(Boolean)));
+    const parentAccounts = users.filter(u => u.role === 'parent');
+    const studentEmails = Array.from(new Set(students.map(s => s.parentEmail?.toLowerCase()).filter(Boolean)));
     
-    return uniqueParentEmails.map(email => {
-      const account = users.find(u => u.email?.toLowerCase() === email && u.role === 'parent');
-      const linkedStudents = students.filter(s => s.parentEmail?.toLowerCase() === email);
-      
-      return {
+    // 1. Start with all registered parent accounts
+    const registryMap = new Map<string, any>();
+    
+    parentAccounts.forEach(account => {
+      const email = account.email?.toLowerCase() || '';
+      registryMap.set(email, {
         email,
-        accountExists: !!account,
-        displayName: account?.displayName || linkedStudents[0]?.guardianName || 'Unknown Parent',
-        students: linkedStudents,
-        userId: account?.uid
-      };
-    }).filter(f => 
+        accountExists: true,
+        displayName: account.displayName || 'Unnamed Parent',
+        students: students.filter(s => s.parentEmail?.toLowerCase() === email),
+        userId: account.uid,
+        lastLogin: account.createdAt // Using createdAt as proxy for this demo
+      });
+    });
+
+    // 2. Add emails from student registry that don't have accounts yet
+    studentEmails.forEach(email => {
+      if (!registryMap.has(email)) {
+        const linkedStudents = students.filter(s => s.parentEmail?.toLowerCase() === email);
+        registryMap.set(email, {
+          email,
+          accountExists: false,
+          displayName: linkedStudents[0]?.guardianName || 'Pending Registration',
+          students: linkedStudents,
+          userId: null
+        });
+      }
+    });
+    
+    return Array.from(registryMap.values()).filter(f => 
       f.email.includes(search.toLowerCase()) || 
       f.displayName.toLowerCase().includes(search.toLowerCase())
     );
@@ -126,7 +148,7 @@ export default function ParentPortalPage() {
             </div>
             <div>
               <h2 className="text-xl font-bold">Family & Parent Portal Registry</h2>
-              <p className="text-sm text-white/80 mt-1">Manage portal access, verify registrations, and update parent contacts</p>
+              <p className="text-sm text-white/80 mt-1">Manage portal access, verify registrations, and audit parent-student links</p>
             </div>
             <div className="ml-auto flex items-center gap-3">
               <div className="hidden md:flex px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
@@ -137,9 +159,9 @@ export default function ParentPortalPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <AdminStatCard label="Total Families" value={familyManagementData.length.toString()} icon={<Users className="h-4 w-4" />} color="bg-rose-50 text-rose-600" />
+          <AdminStatCard label="Total Contacts" value={familyManagementData.length.toString()} icon={<Users className="h-4 w-4" />} color="bg-rose-50 text-rose-600" />
           <AdminStatCard label="Registered Accounts" value={familyManagementData.filter(f => f.accountExists).length.toString()} icon={<ShieldCheck className="h-4 w-4" />} color="bg-emerald-50 text-emerald-600" />
-          <AdminStatCard label="Pending Registration" value={familyManagementData.filter(f => !f.accountExists).length.toString()} icon={<UserPlus className="h-4 w-4" />} color="bg-amber-50 text-amber-600" />
+          <AdminStatCard label="Orphaned Emails" value={familyManagementData.filter(f => f.students.length === 0).length.toString()} icon={<AlertCircle className="h-4 w-4" />} color="bg-amber-50 text-amber-600" />
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -153,7 +175,7 @@ export default function ParentPortalPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Monitoring {familyManagementData.length} families</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Monitoring {familyManagementData.length} records</p>
           </div>
 
           <div className="divide-y divide-gray-50">
@@ -163,16 +185,16 @@ export default function ParentPortalPage() {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${family.accountExists ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
                     {family.displayName[0]}
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-800">{family.displayName}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-800 truncate">{family.displayName}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[10px] text-gray-400 font-medium">{family.email}</p>
+                      <p className="text-[10px] text-gray-400 font-medium truncate">{family.email}</p>
                       {family.accountExists ? (
-                        <span className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">
+                        <span className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded shrink-0">
                           <CheckCircle2 className="h-2 w-2" /> PORTAL ACTIVE
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-[8px] font-bold text-amber-600 bg-amber-50 px-1 rounded">
+                        <span className="flex items-center gap-1 text-[8px] font-bold text-amber-600 bg-amber-50 px-1 rounded shrink-0">
                           <AlertCircle className="h-2 w-2" /> NO ACCOUNT
                         </span>
                       )}
@@ -181,7 +203,7 @@ export default function ParentPortalPage() {
                 </div>
 
                 <div className="flex-1 flex flex-wrap gap-2">
-                  {family.students.map(s => (
+                  {family.students.length > 0 ? family.students.map(s => (
                     <div key={s.id} className="flex items-center gap-2 px-2 py-1 bg-white border border-gray-100 rounded-lg group shadow-sm">
                       <div className="text-[10px]">
                         <span className="font-bold text-gray-700">{s.studentName}</span>
@@ -198,10 +220,19 @@ export default function ParentPortalPage() {
                         <Edit2 className="h-2.5 w-2.5" />
                       </button>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-100 rounded-lg text-[9px] font-bold text-amber-600 uppercase">
+                      <AlertCircle className="h-3 w-3" /> No Students Linked
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
+                  {family.accountExists && family.students.length === 0 && (
+                    <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold gap-1 border-emerald-100 text-emerald-600 hover:bg-emerald-50">
+                      <UserPlus className="h-3 w-3" /> Link Student
+                    </Button>
+                  )}
                   {!family.accountExists && (
                     <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold gap-1 border-rose-100 text-rose-600 hover:bg-rose-50">
                       <Mail className="h-3 w-3" /> Resend Invite
@@ -211,7 +242,7 @@ export default function ParentPortalPage() {
                 </div>
               </div>
             )) : (
-              <div className="py-20 text-center text-gray-400 text-xs italic">No matching families found.</div>
+              <div className="py-20 text-center text-gray-400 text-xs italic">No matching families found in registry.</div>
             )}
           </div>
         </div>
@@ -324,7 +355,6 @@ export default function ParentPortalPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Academic Overview */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-gray-50 flex items-center justify-between">
             <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-tight">
@@ -347,12 +377,11 @@ export default function ParentPortalPage() {
                 </div>
               </div>
             )) : (
-              <div className="py-12 text-center text-gray-400 italic text-xs">No marks recorded yet.</div>
+              <div className="py-12 text-center text-gray-400 italic text-xs">No marks recorded yet for {activeChild?.studentName}.</div>
             )}
           </div>
         </div>
 
-        {/* Announcements */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-gray-50 flex items-center justify-between">
             <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-tight">
@@ -382,7 +411,7 @@ export default function ParentPortalPage() {
                 </div>
               ))
             ) : (
-              <div className="py-12 text-center text-gray-400 italic text-xs">No recent updates.</div>
+              <div className="py-12 text-center text-gray-400 italic text-xs">No recent updates found.</div>
             )}
           </div>
         </div>
