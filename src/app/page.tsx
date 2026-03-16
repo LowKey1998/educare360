@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { ref, set, serverTimestamp, onValue } from 'firebase/database';
-import { useAuth, useUser, useDatabase } from '@/firebase';
+import { useAuth, useUser, useDatabase, useRTDBDoc } from '@/firebase';
 import { Mail, Lock, Eye, EyeOff, Loader2, Sparkles, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -23,6 +23,9 @@ export default function SigninPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
+
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const schoolName = schoolSettings?.schoolName || 'EduCare360';
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -89,7 +92,7 @@ export default function SigninPage() {
 
         toast({
           title: "Account created!",
-          description: `Welcome to EduCare360, ${name}. Registered as a ${role}.`,
+          description: `Welcome to ${schoolName}, ${name}. Registered as a ${role}.`,
         });
       }
       router.push('/dashboard');
@@ -109,7 +112,7 @@ export default function SigninPage() {
       <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-teal-600" />
-          <p className="text-sm text-gray-500 font-medium">Initializing EduCare360...</p>
+          <p className="text-sm text-gray-500 font-medium">Initializing {schoolName}...</p>
         </div>
       </div>
     );
@@ -125,10 +128,14 @@ export default function SigninPage() {
           
           <div className="flex items-center gap-3 mb-4 relative z-10">
             <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10 shadow-lg">
-              <span className="text-white font-bold text-xl font-headline">E</span>
+              {schoolSettings?.logoUrl ? (
+                <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-cover rounded-lg" />
+              ) : (
+                <span className="text-white font-bold text-xl font-headline">{(schoolSettings?.shortName || 'E')[0]}</span>
+              )}
             </div>
             <div>
-              <h2 className="text-xl font-bold font-headline tracking-tight">EduCare360</h2>
+              <h2 className="text-xl font-bold font-headline tracking-tight">{schoolName}</h2>
               <p className="text-xs text-white/70">Unified School Management</p>
             </div>
           </div>

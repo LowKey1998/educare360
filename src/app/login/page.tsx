@@ -4,12 +4,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { useAuth, useDatabase, useRTDBDoc } from '@/firebase';
 import { Mail, Lock, Eye, EyeOff, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const auth = useAuth();
+  const database = useDatabase();
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -17,6 +18,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const schoolName = schoolSettings?.schoolName || 'EduCare360';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +36,7 @@ export default function LoginPage() {
         await createUserWithEmailAndPassword(auth, email, password);
         toast({
           title: "Account created!",
-          description: "Welcome to the EduCare360 platform.",
+          description: `Welcome to the ${schoolName} platform.`,
         });
       }
       router.push('/dashboard');
@@ -62,10 +66,14 @@ export default function LoginPage() {
           
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
-              <span className="text-white font-bold text-lg">E</span>
+              {schoolSettings?.logoUrl ? (
+                <img src={schoolSettings.logoUrl} alt="Logo" className="w-full h-full object-cover rounded-lg" />
+              ) : (
+                <span className="text-white font-bold text-lg">{(schoolSettings?.shortName || 'E')[0]}</span>
+              )}
             </div>
             <div>
-              <h2 className="text-lg font-bold">EduCare360</h2>
+              <h2 className="text-lg font-bold">{schoolName}</h2>
               <p className="text-xs text-white/70">School Management System</p>
             </div>
           </div>

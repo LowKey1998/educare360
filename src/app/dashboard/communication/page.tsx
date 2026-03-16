@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { aiCommunicationDraftTool } from '@/ai/flows/ai-communication-draft-tool';
 import { useToast } from '@/hooks/use-toast';
-import { useDatabase, useUserProfile } from '@/firebase';
+import { useDatabase, useUserProfile, useRTDBDoc } from '@/firebase';
 import { systemService } from '@/services/system';
 
 export default function CommunicationPage() {
@@ -43,6 +43,8 @@ export default function CommunicationPage() {
   const database = useDatabase();
   const { profile } = useUserProfile();
   const { toast } = useToast();
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const schoolName = schoolSettings?.schoolName || 'EduCare360';
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
 
@@ -209,7 +211,7 @@ export default function CommunicationPage() {
                 <div>
                   <h3 className="font-bold text-gray-400 text-sm uppercase tracking-tighter">Draft Canvas Empty</h3>
                   <p className="text-xs text-gray-400 max-w-xs mx-auto mt-2 leading-relaxed">
-                    Configure your message on the left and let EduCare AI craft a tailored communication for your school.
+                    Configure your message on the left and let {schoolName} AI craft a tailored communication for your school.
                   </p>
                 </div>
               </div>

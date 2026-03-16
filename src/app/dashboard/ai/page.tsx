@@ -16,6 +16,7 @@ import {
   Shield,
   ArrowRight
 } from 'lucide-react';
+import { useDatabase, useRTDBDoc } from '@/firebase';
 
 const AI_METRICS = [
   { label: 'Predictions', value: '1,247', icon: TrendingUp, gradient: 'from-violet-500 to-purple-500' },
@@ -26,70 +27,73 @@ const AI_METRICS = [
   { label: 'Accuracy', value: '94.2%', icon: Target, gradient: 'from-green-500 to-emerald-500' },
 ];
 
-const AI_TOOLS = [
-  {
-    title: 'Performance Prediction',
-    desc: 'AI analyzes attendance, grades, and behaviour patterns to predict academic outcomes for each pupil.',
-    metric: '1,247 predictions generated',
-    icon: TrendingUp,
-    color: 'from-violet-500 to-purple-600',
-    border: 'hover:border-purple-200'
-  },
-  {
-    title: 'Fee Default Risk Alerts',
-    desc: 'Identify pupils at risk of fee defaults before they happen. Get proactive intervention recommendations.',
-    metric: '156 risk alerts triggered',
-    icon: TriangleAlert,
-    color: 'from-red-500 to-orange-500',
-    border: 'hover:border-red-200'
-  },
-  {
-    title: 'Auto Report Comments',
-    desc: 'Generate personalized, professional report card comments for each pupil using AI analysis.',
-    metric: '3,890 comments generated',
-    icon: FileText,
-    color: 'from-teal-500 to-emerald-500',
-    border: 'hover:border-teal-200'
-  },
-  {
-    title: 'Enrolment Forecasting',
-    desc: 'Predict future enrollment trends based on historical data. Plan capacity and resources ahead.',
-    metric: '94.2% forecast accuracy',
-    icon: ChartColumn,
-    color: 'from-blue-500 to-indigo-600',
-    border: 'hover:border-blue-200'
-  },
-  {
-    title: 'AI Assistant',
-    desc: 'Chat with EduCare AI for instant answers about school management, policies, and best practices.',
-    metric: '2,340 queries answered',
-    icon: Brain,
-    color: 'from-indigo-500 to-purple-600',
-    border: 'hover:border-indigo-200'
-  },
-  {
-    title: 'Automation Rules',
-    desc: 'Set up automated workflows for attendance alerts, fee reminders, grade notifications, and more.',
-    metric: '7 active automation rules',
-    icon: Zap,
-    color: 'from-amber-500 to-orange-500',
-    border: 'hover:border-amber-200'
-  }
-];
-
-const RECENT_ACTIVITY = [
-  { title: 'Performance prediction generated', sub: 'Tendai Moyo - Grade 2A', time: '2 min ago', color: 'bg-violet-500' },
-  { title: 'Automation rule triggered', sub: 'Low Attendance Alert - 3 pupils notified', time: '15 min ago', color: 'bg-amber-500' },
-  { title: 'Report comments generated', sub: 'Batch: Grade 5A - 28 pupils', time: '1 hr ago', color: 'bg-teal-500' },
-  { title: 'Fee risk analysis completed', sub: '4 high-risk pupils identified', time: '2 hrs ago', color: 'bg-red-500' },
-  { title: 'AI Assistant query', sub: '"How to improve Grade 3 math scores"', time: '3 hrs ago', color: 'bg-indigo-500' },
-  { title: 'Enrollment forecast updated', sub: 'Next term: 492 pupils predicted', time: '5 hrs ago', color: 'bg-blue-500' },
-  { title: 'Automation rule created', sub: 'Birthday Greeting - enabled', time: '1 day ago', color: 'bg-amber-500' },
-  { title: 'Batch predictions completed', sub: 'Grade 7 - 45 pupils analyzed', time: '1 day ago', color: 'bg-violet-500' },
-];
-
 export default function AIAutomationPage() {
   const [activeTab, setActiveTab] = useState('overview');
+  const database = useDatabase();
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const schoolName = schoolSettings?.schoolName || 'EduCare360';
+
+  const AI_TOOLS = [
+    {
+      title: 'Performance Prediction',
+      desc: 'AI analyzes attendance, grades, and behaviour patterns to predict academic outcomes for each pupil.',
+      metric: '1,247 predictions generated',
+      icon: TrendingUp,
+      color: 'from-violet-500 to-purple-600',
+      border: 'hover:border-purple-200'
+    },
+    {
+      title: 'Fee Default Risk Alerts',
+      desc: 'Identify pupils at risk of fee defaults before they happen. Get proactive intervention recommendations.',
+      metric: '156 risk alerts triggered',
+      icon: TriangleAlert,
+      color: 'from-red-500 to-orange-500',
+      border: 'hover:border-red-200'
+    },
+    {
+      title: 'Auto Report Comments',
+      desc: 'Generate personalized, professional report card comments for each pupil using AI analysis.',
+      metric: '3,890 comments generated',
+      icon: FileText,
+      color: 'from-teal-500 to-emerald-500',
+      border: 'hover:border-teal-200'
+    },
+    {
+      title: 'Enrolment Forecasting',
+      desc: 'Predict future enrollment trends based on historical data. Plan capacity and resources ahead.',
+      metric: '94.2% forecast accuracy',
+      icon: ChartColumn,
+      color: 'from-blue-500 to-indigo-600',
+      border: 'hover:border-blue-200'
+    },
+    {
+      title: 'AI Assistant',
+      desc: `Chat with ${schoolName} AI for instant answers about school management, policies, and best practices.`,
+      metric: '2,340 queries answered',
+      icon: Brain,
+      color: 'from-indigo-500 to-purple-600',
+      border: 'hover:border-indigo-200'
+    },
+    {
+      title: 'Automation Rules',
+      desc: 'Set up automated workflows for attendance alerts, fee reminders, grade notifications, and more.',
+      metric: '7 active automation rules',
+      icon: Zap,
+      color: 'from-amber-500 to-orange-500',
+      border: 'hover:border-amber-200'
+    }
+  ];
+
+  const RECENT_ACTIVITY = [
+    { title: 'Performance prediction generated', sub: 'Tendai Moyo - Grade 2A', time: '2 min ago', color: 'bg-violet-500' },
+    { title: 'Automation rule triggered', sub: 'Low Attendance Alert - 3 pupils notified', time: '15 min ago', color: 'bg-amber-500' },
+    { title: 'Report comments generated', sub: 'Batch: Grade 5A - 28 pupils', time: '1 hr ago', color: 'bg-teal-500' },
+    { title: 'Fee risk analysis completed', sub: '4 high-risk pupils identified', time: '2 hrs ago', color: 'bg-red-500' },
+    { title: 'AI Assistant query', sub: '"How to improve Grade 3 math scores"', time: '3 hrs ago', color: 'bg-indigo-500' },
+    { title: 'Enrollment forecast updated', sub: 'Next term: 492 pupils predicted', time: '5 hrs ago', color: 'bg-blue-500' },
+    { title: 'Automation rule created', sub: 'Birthday Greeting - enabled', time: '1 day ago', color: 'bg-amber-500' },
+    { title: 'Batch predictions completed', sub: 'Grade 7 - 45 pupils analyzed', time: '1 day ago', color: 'bg-violet-500' },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

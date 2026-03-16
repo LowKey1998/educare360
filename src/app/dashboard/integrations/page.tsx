@@ -17,10 +17,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useDatabase, useRTDBDoc } from '@/firebase';
 
 export default function IntegrationsPage() {
   const { toast } = useToast();
   const [activeServices, setActiveServices] = useState<string[]>(['firebase', 'google-workspace']);
+  const database = useDatabase();
+  const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
+  const schoolName = schoolSettings?.schoolName || 'EduCare360';
 
   const toggleService = (id: string) => {
     if (activeServices.includes(id)) {
@@ -83,7 +87,7 @@ export default function IntegrationsPage() {
             <Globe className="h-6 w-6 text-blue-600" />
             External Integrations
           </h1>
-          <p className="text-sm text-gray-500">Connect EduCare360 with your favorite educational and financial tools.</p>
+          <p className="text-sm text-gray-500">Connect {schoolName} with your favorite educational and financial tools.</p>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold uppercase tracking-wider">
           <Cloud className="h-3.5 w-3.5" /> API Cloud Active
