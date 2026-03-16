@@ -32,12 +32,24 @@ import {
   Brain,
   Globe,
   Menu,
-  UserCircle
+  UserCircle,
+  X,
+  CheckCheck,
+  Info,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect, useMemo } from 'react';
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from '@/components/ui/button';
+import { notificationService } from '@/services/notifications';
+import { AppNotification } from '@/lib/types';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
@@ -48,6 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Fetch collections for real-time counts
   const { data: admissions } = useRTDBCollection(database, 'admissions');
   const { data: announcements } = useRTDBCollection(database, 'announcements');
+  const { data: notifications } = useRTDBCollection<AppNotification>(database, profile?.uid ? `notifications/${profile.uid}` : null);
   
   const pathname = usePathname();
   const router = useRouter();
@@ -86,6 +99,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const announcementsCount = useMemo(() => {
     return announcements.length;
   }, [announcements]);
+
+  const unreadNotifications = useMemo(() => {
+    return notifications.filter(n => !n.read).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }, [notifications]);
 
   // Apply dynamic primary color
   const primaryColor = schoolSettings?.primaryColor || '#0D9488';
@@ -349,10 +366,75 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
-              <Bell className="h-4.5 w-4.5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
-            </button>
+            {/* Notifications Tray */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors relative">
+                  <Bell className="h-4.5 w-4.5" />
+                  {unreadNotifications.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-[8px] text-white font-bold flex items-center justify-center">
+                      {unreadNotifications.length}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0 overflow-hidden shadow-xl border-gray-100" align="end">
+                <div className="bg-gray-50/80 p-3 border-b border-gray-100 flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-widest">System Alerts</h4>
+                  <button 
+                    onClick={() => notificationService.markAllAsRead(database, profile.uid)}
+                    className="text-[10px] font-bold text-teal-600 hover:underline flex items-center gap-1"
+                  >
+                    <CheckCheck className="h-3 w-3" /> Mark all read
+                  </button>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar divide-y divide-gray-50">
+                  {notifications.length > 0 ? (
+                    notifications.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((n) => (
+                      <div 
+                        key={n.id} 
+                        className={`p-4 hover:bg-gray-50 transition-colors relative group ${!n.read ? 'bg-blue-50/30' : ''}`}
+                        onClick={() => notificationService.markAsRead(database, profile.uid, n.id)}
+                      >
+                        <div className="flex gap-3">
+                          <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center ${
+                            n.type === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                            n.type === 'warning' ? 'bg-amber-100 text-amber-600' :
+                            n.type === 'error' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
+                          }`}>
+                            {n.type === 'warning' ? <AlertCircle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold text-gray-800 leading-tight">{n.title}</p>
+                            <p className="text-[10px] text-gray-500 mt-1 leading-relaxed">{n.message}</p>
+                            <p className="text-[9px] text-gray-400 mt-2 font-medium">
+                              {new Date(n.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1" />}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-12 text-center">
+                      <Bell className="h-8 w-8 text-gray-200 mx-auto mb-3" />
+                      <p className="text-xs text-gray-400 font-medium">No system notifications</p>
+                    </div>
+                  )}
+                </div>
+                {notifications.length > 0 && (
+                  <div className="p-2 bg-gray-50/50 border-t border-gray-100 text-center">
+                    <button 
+                      onClick={() => notificationService.clearNotifications(database, profile.uid)}
+                      className="text-[9px] font-bold text-gray-400 hover:text-rose-500 uppercase tracking-tighter"
+                    >
+                      Clear All History
+                    </button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
             <div className="flex items-center gap-2 ml-4 border-l border-gray-100 pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-[11px] font-bold text-gray-800 leading-none">{profile.displayName || profile.email?.split('@')[0]}</p>

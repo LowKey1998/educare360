@@ -1,6 +1,7 @@
 
 import { Database, ref, push, update, serverTimestamp } from 'firebase/database';
 import { Transaction } from '@/lib/types';
+import { notificationService } from './notifications';
 
 export const financeService = {
   async recordPayment(db: Database, studentId: string, studentName: string, currentBalance: number, amount: number, method: string) {
@@ -12,7 +13,7 @@ export const financeService = {
     });
 
     // Log transaction
-    return push(ref(db, 'transactions'), {
+    const txRef = await push(ref(db, 'transactions'), {
       studentId,
       studentName,
       amount,
@@ -20,5 +21,15 @@ export const financeService = {
       type: 'Fee Payment',
       timestamp: serverTimestamp()
     });
+
+    // Notify Admins of manual revenue
+    await notificationService.notifyRole(db, 'admin', {
+      title: 'Payment Recorded',
+      message: `$${amount} manual payment posted for ${studentName} via ${method}.`,
+      type: 'success',
+      link: '/dashboard/finance'
+    });
+
+    return txRef;
   }
 };
