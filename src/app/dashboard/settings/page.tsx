@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from 'react';
@@ -34,8 +35,9 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { useDatabase, useRTDBDoc } from '@/firebase';
-import { ref, set, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
+import { systemService } from '@/services/system';
+import { SystemSettings } from '@/lib/types';
 
 const PRESET_COLORS = [
   { name: 'Teal (Default)', value: '#0D9488' },
@@ -53,7 +55,6 @@ const CURRENCIES = [
   { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
   { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'ZWL', symbol: 'Z$', name: 'Zimbabwean Dollar' },
   { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
   { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
 ];
@@ -61,10 +62,10 @@ const CURRENCIES = [
 export default function SystemSettingsPage() {
   const database = useDatabase();
   const { toast } = useToast();
-  const { data: schoolSettings, loading } = useRTDBDoc(database, 'system_settings');
+  const { data: schoolSettings, loading } = useRTDBDoc<SystemSettings>(database, 'system_settings');
   
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SystemSettings>({
     schoolName: '',
     shortName: '',
     motto: '',
@@ -111,11 +112,8 @@ export default function SystemSettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await set(ref(database, 'system_settings'), {
-        ...formData,
-        updatedAt: serverTimestamp()
-      });
-      toast({ title: "Settings Saved", description: "Institutional configuration updated successfully." });
+      await systemService.saveSettings(database, formData);
+      toast({ title: "Settings Saved", description: "Institutional configuration updated." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     } finally {
@@ -164,9 +162,9 @@ export default function SystemSettingsPage() {
           </h1>
           <p className="text-sm text-gray-500">Configure global institutional settings and platform behavior.</p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2" style={{ backgroundColor: formData.primaryColor }}>
+        <Button onClick={handleSave} disabled={isSaving} className="gap-2 font-bold shadow-lg" style={{ backgroundColor: formData.primaryColor }}>
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Changes
+          Save Configuration
         </Button>
       </div>
 
@@ -184,7 +182,7 @@ export default function SystemSettingsPage() {
             <Card className="md:col-span-2 border-gray-100 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-sm">Institutional Identity</CardTitle>
-                <CardDescription className="text-xs">This information appears on documents, invoices, and reports.</CardDescription>
+                <CardDescription className="text-xs">Official information for documents and reports.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -279,7 +277,7 @@ export default function SystemSettingsPage() {
             <Card className="border-gray-100 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-sm">Institutional Visual Identity</CardTitle>
-                <CardDescription className="text-xs">Select your brand color and upload your school logo.</CardDescription>
+                <CardDescription className="text-xs">Primary brand color and logo.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -321,7 +319,7 @@ export default function SystemSettingsPage() {
                   <Input 
                     type="file" 
                     accept="image/*" 
-                    className="text-xs" 
+                    className="text-xs cursor-pointer" 
                     onChange={handleLogoUpload}
                   />
                 </div>
@@ -331,7 +329,7 @@ export default function SystemSettingsPage() {
             <Card className="border-gray-100 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-sm">Social Presence</CardTitle>
-                <CardDescription className="text-xs">Connect your institution's social media accounts.</CardDescription>
+                <CardDescription className="text-xs">Official institutional social links.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -380,7 +378,7 @@ export default function SystemSettingsPage() {
               </CardHeader>
               <CardContent>
                 <Textarea 
-                  placeholder="Enter your school's terms and conditions here..."
+                  placeholder="Enter institutional terms..."
                   className="min-h-[300px] text-xs leading-relaxed"
                   value={formData.termsAndConditions}
                   onChange={(e) => setFormData({...formData, termsAndConditions: e.target.value})}
@@ -393,11 +391,11 @@ export default function SystemSettingsPage() {
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ShieldAlert className="h-4 w-4 text-teal-600" /> Privacy Policy
                 </CardTitle>
-                <CardDescription className="text-xs">Data handling and student privacy policies.</CardDescription>
+                <CardDescription className="text-xs">Data handling and student privacy policy.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Textarea 
-                  placeholder="Enter your privacy policy details here..."
+                  placeholder="Enter privacy policy..."
                   className="min-h-[300px] text-xs leading-relaxed"
                   value={formData.privacyPolicy}
                   onChange={(e) => setFormData({...formData, privacyPolicy: e.target.value})}
@@ -411,7 +409,7 @@ export default function SystemSettingsPage() {
           <Card className="border-gray-100 shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm">Session Management</CardTitle>
-              <CardDescription className="text-xs">Define the active term and academic year for all records.</CardDescription>
+              <CardDescription className="text-xs">Active term and academic year global definition.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
@@ -440,9 +438,9 @@ export default function SystemSettingsPage() {
                 <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
                   <div>
-                    <p className="text-xs font-bold text-gray-800">Operational Update</p>
+                    <p className="text-xs font-bold text-gray-800">Operational Sync</p>
                     <p className="text-[10px] text-gray-500 mt-1 leading-relaxed">
-                      Changing these settings will update all dashboards, report card headers, and attendance registers across the entire institution instantly.
+                      All dashboards, report cards, and registers will synchronize to this session instantly.
                     </p>
                   </div>
                 </div>
@@ -455,7 +453,7 @@ export default function SystemSettingsPage() {
           <Card className="border-gray-100 shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm">Finance & Localization</CardTitle>
-              <CardDescription className="text-xs">Configure how currency and billing information is displayed globally.</CardDescription>
+              <CardDescription className="text-xs">Global currency and billing format configuration.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -486,18 +484,18 @@ export default function SystemSettingsPage() {
                       <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{formData.currency}</span>
                     </div>
                     <p className="text-[10px] text-blue-600 mt-2 italic leading-relaxed">
-                      All financial modules, pupil ledgers, and inventory valuations will use this formatting.
+                      Applied to all pupil ledgers, financial reports, and inventory valuations.
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Currency Code (Read Only)</Label>
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Currency Code</Label>
                     <Input value={formData.currency} readOnly className="bg-gray-50 font-mono text-xs" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Symbol (Read Only)</Label>
+                    <Label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Symbol</Label>
                     <Input value={formData.currencySymbol} readOnly className="bg-gray-50 font-mono text-xs" />
                   </div>
                 </div>

@@ -26,7 +26,6 @@ import {
   Tooltip
 } from 'recharts';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, push, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Dialog, 
@@ -40,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { academicService } from '@/services/academic';
 
 const radarData = [
   { subject: 'Language', A: 78, B: 85, fullMark: 100 },
@@ -61,7 +61,7 @@ export default function ECDDevelopmentPage() {
   const { data: observations, loading: obsLoading } = useRTDBCollection(database, 'ecd_observations');
 
   const ecdStudents = useMemo(() => {
-    return students.filter(s => ['Baby Class', 'Middle Class', 'Reception'].includes(s.grade));
+    return students.filter(s => ['Reception', 'Baby Class', 'Middle Class'].includes(s.grade));
   }, [students]);
 
   const handleAddObservation = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -75,15 +75,14 @@ export default function ECDDevelopmentPage() {
       studentId,
       studentName: student?.studentName || "Unknown",
       grade: student?.grade || "N/A",
-      type: formData.get('type'),
-      content: formData.get('content'),
+      type: formData.get('type') as string,
+      content: formData.get('content') as string,
       author: "ECD Specialist",
       date: new Date().toISOString().split('T')[0],
-      createdAt: serverTimestamp()
     };
 
     try {
-      await push(ref(database, 'ecd_observations'), data);
+      await academicService.logECD(database, data);
       setIsAddOpen(false);
       toast({ title: "Observation Logged", description: `Saved entry for ${data.studentName}.` });
     } catch (e) {
@@ -95,7 +94,6 @@ export default function ECDDevelopmentPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <svg viewBox="0 0 400 200" className="w-full h-full">

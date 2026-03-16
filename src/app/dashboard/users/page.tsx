@@ -17,7 +17,6 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, remove, set, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Dialog, 
@@ -37,6 +36,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { userService } from '@/services/users';
+import { UserProfile } from '@/lib/types';
 
 export default function UsersRBACPage() {
   const [search, setSearch] = useState('');
@@ -45,7 +46,7 @@ export default function UsersRBACPage() {
   
   const database = useDatabase();
   const { toast } = useToast();
-  const { data: users, loading } = useRTDBCollection(database, 'users');
+  const { data: users, loading } = useRTDBCollection<UserProfile>(database, 'users');
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
@@ -68,21 +69,17 @@ export default function UsersRBACPage() {
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
-    // For demo/simulated registration we use email-based ID if not using real auth creation here
-    // In a real app, this would invite the user or create the record after Auth creation
-    const tempId = email.replace(/[.@]/g, '_'); 
 
     const data = {
-      displayName: formData.get('name'),
+      displayName: formData.get('name') as string,
       email: email,
-      role: formData.get('role'),
-      createdAt: serverTimestamp()
+      role: formData.get('role') as any,
     };
 
     try {
-      await set(ref(database, `users/${tempId}`), data);
+      await userService.inviteUser(database, data);
       setIsAddOpen(false);
-      toast({ title: "User Added", description: `${data.displayName} has been assigned the ${data.role} role.` });
+      toast({ title: "User Added", description: `${data.displayName} assigned the ${data.role} role.` });
     } catch (e) {
       toast({ title: "Error", description: "Failed to add user account.", variant: "destructive" });
     } finally {
@@ -91,10 +88,10 @@ export default function UsersRBACPage() {
   };
 
   const handleDeleteUser = async (uid: string) => {
-    if (!confirm('Are you sure you want to remove this user from the platform?')) return;
+    if (!confirm('Are you sure you want to revoke this user\'s institutional access?')) return;
     try {
-      await remove(ref(database, `users/${uid}`));
-      toast({ title: "User Removed", description: "Access revoked successfully." });
+      await userService.deleteUser(database, uid);
+      toast({ title: "Access Revoked" });
     } catch (e) {
       toast({ title: "Error", description: "Failed to remove user account.", variant: "destructive" });
     }
@@ -102,7 +99,6 @@ export default function UsersRBACPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* High-Fidelity Header */}
       <div className="bg-gradient-to-r from-[#1E3A5F] via-indigo-600 to-indigo-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <svg viewBox="0 0 400 200" className="w-full h-full">
@@ -158,11 +154,11 @@ export default function UsersRBACPage() {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Full Name</Label>
-                  <Input name="name" placeholder="John Nyathi" required />
+                  <Input name="name" placeholder="Institutional User" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Email Address</Label>
-                  <Input name="email" type="email" placeholder="john@school.edu" required />
+                  <Input name="email" type="email" placeholder="user@school.edu" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Assign System Role</Label>
