@@ -49,11 +49,12 @@ export default function DashboardPage() {
   const { data: students, loading: studentsLoading } = useRTDBCollection(database, 'students');
   const { data: admissions, loading: admissionsLoading } = useRTDBCollection(database, 'admissions');
   const { data: users, loading: usersLoading } = useRTDBCollection(database, 'users');
+  const { data: announcements, loading: announcementsLoading } = useRTDBCollection(database, 'announcements');
 
-  const loading = studentsLoading || admissionsLoading || usersLoading || profileLoading;
+  const loading = studentsLoading || admissionsLoading || usersLoading || profileLoading || announcementsLoading;
 
   // Role Checks
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
   const isParent = profile?.role === 'parent';
 
   // Parent Specific Logic
@@ -67,13 +68,19 @@ export default function DashboardPage() {
     const totalEnrolment = students.length;
     const staffCount = users.filter(u => u.role === 'admin' || u.role === 'staff').length;
     const totalRevenue = students.reduce((acc, s) => acc + (parseFloat(s.feeBalance) || 0), 0);
+    const avgAttendance = students.length > 0 
+      ? students.reduce((acc, s) => acc + (parseFloat(s.attendanceRate) || 0), 0) / students.length 
+      : 0;
+
     return {
       totalEnrolment,
       staffCount,
       revenue: totalRevenue.toLocaleString(),
-      newApps: admissions.filter(a => a.status === 'New').length
+      newApps: admissions.filter(a => a.status === 'New').length,
+      attendance: avgAttendance.toFixed(1),
+      events: announcements.length
     };
-  }, [students, admissions, users]);
+  }, [students, admissions, users, announcements]);
 
   // Parent Memoized Metrics
   const parentStats = useMemo(() => {
@@ -177,11 +184,21 @@ export default function DashboardPage() {
 
           <div className="bg-white rounded-xl border border-gray-100 p-5">
             <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-500" /> Today's Schedule
+              <Calendar className="w-4 h-4 text-blue-500" /> Recent Announcements
             </h3>
-            <div className="text-center py-12">
-              <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-xs text-gray-400">Check the Calendar section for full timetable details.</p>
+            <div className="space-y-3">
+              {announcements.slice(0, 3).map((ann) => (
+                <div key={ann.id} className="p-3 border border-gray-50 rounded-lg hover:bg-gray-50 transition-colors">
+                  <p className="text-xs font-bold text-gray-700">{ann.communicationType || 'Update'}</p>
+                  <p className="text-[10px] text-gray-500 line-clamp-2 mt-1">{ann.content}</p>
+                </div>
+              ))}
+              {announcements.length === 0 && (
+                <div className="text-center py-12">
+                  <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400">No recent announcements found.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -208,10 +225,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard title="Enrolment" value={adminStats.totalEnrolment.toString()} trend="+12%" isPositive={true} icon={<Users className="w-5 h-5" />} color="bg-blue-50 text-blue-600" />
         <StatCard title="Revenue" value={`$${adminStats.revenue}`} trend="+22%" isPositive={true} icon={<DollarSign className="w-5 h-5" />} color="bg-green-50 text-green-600" />
-        <StatCard title="Attendance" value="94.7%" trend="-1.2%" isPositive={false} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
+        <StatCard title="Attendance" value={`${adminStats.attendance}%`} trend="Live" isPositive={true} icon={<ClipboardCheck className="w-5 h-5" />} color="bg-amber-50 text-amber-600" />
         <StatCard title="Staff" value={adminStats.staffCount.toString()} trend="+4" isPositive={true} icon={<Briefcase className="w-5 h-5" />} color="bg-rose-50 text-rose-600" />
         <StatCard title="Applications" value={adminStats.newApps.toString()} trend="Live" isPositive={true} icon={<UserPlus className="w-5 h-5" />} color="bg-indigo-50 text-indigo-600" />
-        <StatCard title="Events" value="5" trend="Upcoming" isPositive={true} icon={<Calendar className="w-5 h-5" />} color="bg-teal-50 text-teal-600" />
+        <StatCard title="Events" value={adminStats.events.toString()} trend="Announcements" isPositive={true} icon={<Calendar className="w-5 h-5" />} color="bg-teal-50 text-teal-600" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-5">

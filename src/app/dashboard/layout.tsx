@@ -217,6 +217,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const currentNav = isParent ? parentNav : adminNav;
   const schoolName = schoolSettings?.schoolName || 'Sunrise Academy';
   const logoUrl = schoolSettings?.logoUrl;
+  const motto = schoolSettings?.motto;
 
   return (
     <div className="flex h-screen bg-[#F8F9FC] overflow-hidden" style={{ '--primary': primaryColor } as React.CSSProperties}>
@@ -242,6 +243,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <p className="text-gray-500 text-[10px] truncate uppercase tracking-widest">{schoolSettings?.currentTerm || 'Term 1'} • {schoolSettings?.currentYear || '2026'}</p>
             </div>
           </div>
+          
+          {motto && (
+            <p className="mt-2 text-[9px] text-teal-500/60 font-medium italic truncate px-1">
+              "{motto}"
+            </p>
+          )}
 
           <div className="mt-3 relative">
             <div className="w-full flex items-center gap-2 px-2.5 py-2 bg-[#1A2742] rounded-lg border border-[#1E3A5F]/50">

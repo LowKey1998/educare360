@@ -125,6 +125,7 @@ export interface Announcement {
 export interface SystemSettings {
   schoolName: string;
   shortName: string;
+  motto: string;
   currentTerm: string;
   currentYear: string;
   email: string;

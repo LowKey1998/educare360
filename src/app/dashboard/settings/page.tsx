@@ -17,7 +17,8 @@ import {
   Upload,
   Link as LinkIcon,
   ImageIcon,
-  Palette
+  Palette,
+  Quote
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ export default function SystemSettingsPage() {
   const [formData, setFormData] = useState({
     schoolName: '',
     shortName: '',
+    motto: '',
     currentTerm: 'Term 1',
     currentYear: '2026',
     email: '',
@@ -62,6 +64,7 @@ export default function SystemSettingsPage() {
       setFormData({
         schoolName: schoolSettings.schoolName || '',
         shortName: schoolSettings.shortName || '',
+        motto: schoolSettings.motto || '',
         currentTerm: schoolSettings.currentTerm || 'Term 1',
         currentYear: schoolSettings.currentYear || '2026',
         email: schoolSettings.email || '',
@@ -113,7 +116,7 @@ export default function SystemSettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-            <Settings className="h-6 w-6 text-teal-600" style={{ color: formData.primaryColor }} />
+            <Settings className="h-6 w-6" style={{ color: formData.primaryColor }} />
             System Administration
           </h1>
           <p className="text-sm text-gray-500">Configure global institutional settings and platform behavior.</p>
@@ -157,6 +160,16 @@ export default function SystemSettingsPage() {
                       onChange={(e) => setFormData({...formData, shortName: e.target.value})}
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-gray-400 flex items-center gap-2 uppercase tracking-widest">
+                    <Quote className="h-3 w-3" /> School Motto
+                  </Label>
+                  <Input 
+                    placeholder="e.g. Knowledge is Power" 
+                    value={formData.motto}
+                    onChange={(e) => setFormData({...formData, motto: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[11px] font-bold text-gray-400">INSTITUTIONAL EMAIL</Label>
@@ -204,6 +217,9 @@ export default function SystemSettingsPage() {
                 <div>
                   <p className="font-bold text-gray-800">{formData.schoolName || 'Institution Name'}</p>
                   <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">{formData.shortName || 'CODE'}</p>
+                  {formData.motto && (
+                    <p className="text-[10px] text-gray-500 mt-2 italic">"{formData.motto}"</p>
+                  )}
                 </div>
                 <div className="w-full pt-4 border-t border-gray-200 text-left space-y-2">
                   <p className="text-[10px] text-gray-500 flex items-center gap-2"><Mail className="h-3 w-3" /> {formData.email || 'not set'}</p>
