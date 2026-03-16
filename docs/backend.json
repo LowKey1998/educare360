@@ -15,18 +15,6 @@
         "applicationId": { "type": "string" }
       }
     },
-    "AttendanceRecord": {
-      "title": "AttendanceRecord",
-      "description": "A daily attendance log for a student.",
-      "type": "object",
-      "properties": {
-        "studentName": { "type": "string" },
-        "grade": { "type": "string" },
-        "status": { "type": "string", "enum": ["present", "absent", "late"] },
-        "date": { "type": "string", "format": "date" },
-        "lastUpdated": { "type": "object" }
-      }
-    },
     "Student": {
       "title": "Student",
       "description": "A registered pupil in the school system.",
@@ -35,14 +23,38 @@
         "admissionNo": { "type": "string" },
         "studentName": { "type": "string" },
         "grade": { "type": "string" },
-        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "gender": { "type": "string", "enum": ["Male", "Female"] },
         "guardianName": { "type": "string" },
         "guardianPhone": { "type": "string" },
-        "attendanceRate": { "type": "number" },
+        "parentEmail": { "type": "string", "format": "email" },
         "feeBalance": { "type": "number" },
-        "status": { "type": "string", "enum": ["Active", "Suspended", "Transferred", "Graduated", "Withdrawn"] },
-        "dob": { "type": "string", "format": "date" },
-        "age": { "type": "number" }
+        "attendanceRate": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "School": {
+      "title": "School",
+      "description": "An educational institution or branch on the platform.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "city": { "type": "string" },
+        "type": { "type": "string", "enum": ["Main Campus", "Branch", "Satellite"] },
+        "enrollment": { "type": "number" },
+        "staff": { "type": "number" },
+        "plan": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "PlatformUser": {
+      "title": "PlatformUser",
+      "description": "A registered account with role-based access.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff", "parent"] },
+        "createdAt": { "type": "object" }
       }
     }
   },
@@ -50,17 +62,13 @@
     "providers": ["password"]
   },
   "firestore": {
-    "/admissions/{admissionId}": {
-      "schema": "#/backend/entities/Admission",
-      "description": "Collection of admission applications."
+    "/schools/{schoolId}": {
+      "schema": "#/backend/entities/School",
+      "description": "Directory of all schools managed on the platform."
     },
-    "/attendance/{attendanceId}": {
-      "schema": "#/backend/entities/AttendanceRecord",
-      "description": "Daily attendance logs."
-    },
-    "/students/{studentId}": {
-      "schema": "#/backend/entities/Student",
-      "description": "Collection of all enrolled pupils."
+    "/users/{userId}": {
+      "schema": "#/backend/entities/PlatformUser",
+      "description": "System users and their institutional roles."
     }
   }
 }

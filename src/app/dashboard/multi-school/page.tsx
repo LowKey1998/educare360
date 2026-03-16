@@ -1,8 +1,10 @@
+
 "use client"
 
+import { useState, useMemo } from 'react';
 import { 
   Building2, 
-  Printer, 
+  Plus,
   Download, 
   TrendingUp, 
   Users, 
@@ -13,270 +15,296 @@ import {
   Globe, 
   Clock, 
   Eye, 
-  TrendingDown, 
-  TriangleAlert, 
-  CircleCheck, 
-  Award,
-  Search
+  Trash2,
+  Database,
+  Loader2,
+  TriangleAlert,
+  Search,
+  MapPin
 } from 'lucide-react';
-import { useState } from 'react';
+import { useDatabase, useRTDBCollection } from '@/firebase';
+import { ref, push, remove, serverTimestamp } from 'firebase/database';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 export default function MultiSchoolPage() {
+  const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const database = useDatabase();
+  const { toast } = useToast();
+  const { data: schools, loading } = useRTDBCollection(database, 'schools');
+
+  const filteredSchools = useMemo(() => {
+    return schools.filter(s => 
+      s.name?.toLowerCase().includes(search.toLowerCase()) || 
+      s.city?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [schools, search]);
+
+  const stats = useMemo(() => {
+    const totalEnrollment = schools.reduce((acc, s) => acc + (parseInt(s.enrollment) || 0), 0);
+    const totalStaff = schools.reduce((acc, s) => acc + (parseInt(s.staff) || 0), 0);
+    const activeCount = schools.filter(s => s.status === 'Active').length;
+    
+    return {
+      totalSchools: schools.length,
+      activeSchools: activeCount,
+      totalEnrollment,
+      totalStaff,
+      avgRatio: totalStaff > 0 ? (totalEnrollment / totalStaff).toFixed(1) : '0.0'
+    };
+  }, [schools]);
+
+  const handleAddSchool = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      city: formData.get('city'),
+      type: formData.get('type'),
+      enrollment: parseInt(formData.get('enrollment') as string) || 0,
+      staff: parseInt(formData.get('staff') as string) || 0,
+      revenue: formData.get('revenue') || '$0',
+      plan: formData.get('plan'),
+      status: 'Active',
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await push(ref(database, 'schools'), data);
+      setIsAddOpen(false);
+      toast({ title: "School Registered", description: `${data.name} has been added to the platform.` });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to add school.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remove this school from the platform? All data will be archived.')) return;
+    try {
+      await remove(ref(database, `schools/${id}`));
+      toast({ title: "School Removed", description: "The institution was deleted." });
+    } catch (e) {
+      toast({ title: "Error", description: "Delete failed." });
+    }
+  };
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-white" />
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* High-Fidelity Header */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <svg viewBox="0 0 400 200" className="w-full h-full">
+            <circle cx="350" cy="30" r="80" fill="white" />
+            <circle cx="100" cy="180" r="120" fill="white" />
+          </svg>
+        </div>
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
+            <Building2 className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">Multi-School Management</h2>
+            <p className="text-sm text-white/80 mt-1">Super-admin control for groups of schools and branches</p>
+          </div>
+          <div className="ml-auto hidden md:flex items-center gap-3">
+            <div className="px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 backdrop-blur-md">
+              <Globe className="w-3.5 h-3.5" /> Platform Global
             </div>
-            Multi-School Management
-          </h2>
-          <p className="text-xs text-gray-500 mt-0.5">Manage 8 schools across 4 cities with 3,137 total pupils</p>
-        </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Printer className="w-3.5 h-3.5" /> Print Report
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Download className="w-3.5 h-3.5" /> Export Data
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* Primary Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          label="Total Schools" 
-          value="8" 
-          trend="7 active, 1 pending" 
-          icon={<Building2 className="w-[18px] h-[18px] text-blue-600" />} 
-          color="bg-blue-50" 
-          textColor="text-blue-600" 
-        />
-        <StatCard 
-          label="Total Enrollment" 
-          value="3,137" 
-          trend="345 new admissions" 
-          icon={<Users className="w-[18px] h-[18px] text-purple-600" />} 
-          color="bg-purple-50" 
-          textColor="text-purple-600" 
-        />
-        <StatCard 
-          label="Total Staff" 
-          value="285" 
-          trend="11.0:1 pupil-staff ratio" 
-          icon={<GraduationCap className="w-[18px] h-[18px] text-teal-600" />} 
-          color="bg-teal-50" 
-          textColor="text-teal-600" 
-        />
-        <StatCard 
-          label="Platform Revenue" 
-          value="$1897K" 
-          trend="Avg 84.8% collection" 
-          icon={<DollarSign className="w-[18px] h-[18px] text-green-600" />} 
-          color="bg-green-50" 
-          textColor="text-green-600" 
-        />
+        <StatCard icon={<Building2 className="w-4 h-4 text-blue-600" />} label="Total Schools" value={loading ? '...' : stats.totalSchools.toString()} color="bg-blue-50" trend={`${stats.activeSchools} active`} />
+        <StatCard icon={<Users className="w-4 h-4 text-purple-600" />} label="Total Pupils" value={loading ? '...' : stats.totalEnrollment.toLocaleString()} color="bg-purple-50" trend="Cross-platform" />
+        <StatCard icon={<GraduationCap className="w-4 h-4 text-teal-600" />} label="Total Staff" value={loading ? '...' : stats.totalStaff.toString()} color="bg-teal-50" trend={`${stats.avgRatio} pupils/staff`} />
+        <StatCard icon={<DollarSign className="w-4 h-4 text-green-600" />} label="Platform Plan" value="Enterprise" color="bg-green-50" trend="Active Subscription" />
       </div>
 
-      {/* Tabs and Content Area */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-        <div className="flex border-b border-gray-100 px-2 overflow-x-auto custom-scrollbar">
-          <TabButton 
-            active={activeTab === 'overview'} 
-            onClick={() => setActiveTab('overview')} 
-            icon={<ChartColumn className="w-3.5 h-3.5" />}
-            label="Super Admin Overview"
-          />
-          <TabButton 
-            active={activeTab === 'directory'} 
-            onClick={() => setActiveTab('directory')} 
-            icon={<Building2 className="w-3.5 h-3.5" />}
-            label="School Directory"
-            badge="8"
-          />
-          <TabButton 
-            active={activeTab === 'branch'} 
-            onClick={() => setActiveTab('branch')} 
-            icon={<GitBranch className="w-3.5 h-3.5" />}
-            label="Branch Management"
-            badge="3"
-          />
-          <TabButton 
-            active={activeTab === 'dashboard'} 
-            onClick={() => setActiveTab('dashboard')} 
-            icon={<Globe className="w-3.5 h-3.5" />}
-            label="School Dashboard"
-          />
-          <TabButton 
-            active={activeTab === 'audit'} 
-            onClick={() => setActiveTab('audit')} 
-            icon={<Clock className="w-3.5 h-3.5" />}
-            label="Audit Log"
-            badge="10"
-          />
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-100 px-4 overflow-x-auto custom-scrollbar">
+          <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} label="Global Directory" />
+          <TabButton active={activeTab === 'branches'} onClick={() => setActiveTab('branches')} label="Branch Groups" />
+          <TabButton active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} label="Platform Audit" />
         </div>
 
         <div className="p-5">
-          <div className="space-y-5">
-            {/* Top Insight Grid (Overview Specific) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <MiniInsightCard label="Total Schools" value="8" trend="7 active" color="bg-blue-50" textColor="text-blue-600" icon={<Building2 className="w-5 h-5" />} />
-              <MiniInsightCard label="Total Enrollment" value="3,137" trend="74.2% capacity" color="bg-purple-50" textColor="text-purple-600" icon={<Users className="w-5 h-5" />} />
-              <MiniInsightCard label="Total Staff" value="285" trend="11.0 pupil:staff" color="bg-teal-50" textColor="text-teal-600" icon={<GraduationCap className="w-5 h-5" />} />
-              <MiniInsightCard label="Platform Revenue" value="$1897K" trend="Avg 84.8% collection" color="bg-green-50" textColor="text-green-600" icon={<DollarSign className="w-5 h-5" />} />
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative flex-1 w-full max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <Input 
+                  className="pl-9 text-xs h-9" 
+                  placeholder="Search institutions by name or city..." 
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-9 text-xs font-bold gap-1.5 shadow-sm">
+                    <Plus className="h-3.5 w-3.5" /> Register School
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <form onSubmit={handleAddSchool}>
+                    <DialogHeader>
+                      <DialogTitle>Add New Institutional Node</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label>School Full Name</Label>
+                        <Input name="name" placeholder="e.g. Sunrise Academy - Borrowdale" required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>City/Location</Label>
+                          <Input name="city" placeholder="e.g. Harare" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Campus Type</Label>
+                          <Select name="type" defaultValue="Main Campus">
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Main Campus">Main Campus</SelectItem>
+                              <SelectItem value="Branch">Branch</SelectItem>
+                              <SelectItem value="Satellite">Satellite</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Est. Enrollment</Label>
+                          <Input name="enrollment" type="number" placeholder="0" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Staff Count</Label>
+                          <Input name="staff" type="number" placeholder="0" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Service Plan</Label>
+                        <Select name="plan" defaultValue="Professional">
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Starter">Starter</SelectItem>
+                            <SelectItem value="Professional">Professional</SelectItem>
+                            <SelectItem value="Enterprise">Enterprise</SelectItem>
+                            <SelectItem value="Ultimate">Ultimate</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isSubmitting} className="w-full bg-blue-600">
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Provision Institution
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
 
-            {/* Trends and School Status Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-800">Cross-School Trends</h3>
-                    <p className="text-[10px] text-gray-500 mt-0.5">6-month comparison across key schools</p>
-                  </div>
-                  <select className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-teal-500 bg-transparent">
-                    <option value="enrollment">Enrollment</option>
-                    <option value="attendance">Attendance %</option>
-                    <option value="feeCollection">Fee Collection %</option>
-                    <option value="academicPerformance">Academic %</option>
-                  </select>
-                </div>
-                
-                <div className="space-y-3">
-                  <TrendRow month="Sep" values={[820, 398, 650]} labels={["Sunrise Main", "Sunrise Borrowdale", "Greenfield Intl"]} />
-                  <TrendRow month="Oct" values={[828, 405, 658]} labels={["Sunrise Main", "Sunrise Borrowdale", "Greenfield Intl"]} />
-                  <TrendRow month="Nov" values={[835, 410, 665]} labels={["Sunrise Main", "Sunrise Borrowdale", "Greenfield Intl"]} />
-                  <TrendRow month="Dec" values={[835, 412, 668]} labels={["Sunrise Main", "Sunrise Borrowdale", "Greenfield Intl"]} />
-                  <TrendRow month="Jan" values={[842, 418, 672]} labels={["Sunrise Main", "Sunrise Borrowdale", "Greenfield Intl"]} />
-                  <TrendRow month="Feb" values={[847, 423, 678]} labels={["Sunrise Main", "Sunrise Borrowdale", "Greenfield Intl"]} />
-                </div>
-
-                <div className="flex gap-4 mt-4 pt-3 border-t border-gray-50">
-                  <LegendItem color="rgb(13, 148, 136)" label="Sunrise Main" />
-                  <LegendItem color="rgb(124, 58, 237)" label="Sunrise Borrowdale" />
-                  <LegendItem color="rgb(5, 150, 105)" label="Greenfield Intl" />
-                </div>
+            {loading ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Mapping Global Nodes...</p>
               </div>
-
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <h3 className="text-sm font-semibold text-gray-800 mb-3">School Status</h3>
-                <div className="space-y-2">
-                  <StatusItem initial="SA" name="Sunrise Academy" pupils="847" status="Active" color="rgb(13, 148, 136)" />
-                  <StatusItem initial="SA" name="Sunrise Academy - Borrowdale" pupils="423" status="Active" color="rgb(13, 148, 136)" />
-                  <StatusItem initial="SA" name="Sunrise Academy - Bulawayo" pupils="312" status="Active" color="rgb(13, 148, 136)" />
-                  <StatusItem initial="HP" name="Heritage Preparatory School" pupils="534" status="Active" color="rgb(29, 78, 216)" />
-                  <StatusItem initial="HP" name="Heritage Prep - Chitungwiza" pupils="198" status="Active" color="rgb(29, 78, 216)" />
-                  <StatusItem initial="GI" name="Greenfield International School" pupils="678" status="Active" color="rgb(5, 150, 105)" />
-                  <StatusItem initial="LS" name="Little Stars ECD Centre" pupils="145" status="Active" color="rgb(236, 72, 153)" />
-                  <StatusItem initial="MC" name="Masvingo Community School" pupils="0" status="Pending Setup" color="rgb(217, 119, 6)" statusColor="bg-amber-100 text-amber-700" />
-                </div>
-              </div>
-            </div>
-
-            {/* School Comparison Table */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b border-gray-50">
-                <h3 className="text-sm font-semibold text-gray-800">School Comparison</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-gray-500 font-medium">Sort by:</span>
-                  <select className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:ring-1 focus:ring-teal-500 bg-transparent">
-                    <option value="enrollment">Enrollment</option>
-                    <option value="revenue">Revenue</option>
-                    <option value="collection">Collection Rate</option>
-                    <option value="staff">Staff Count</option>
-                  </select>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
+            ) : filteredSchools.length > 0 ? (
+              <div className="overflow-x-auto rounded-xl border border-gray-50">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50/50">
-                      <th className="text-left px-4 py-2.5 font-semibold text-gray-600">School</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Type</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-gray-600">Enrollment</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-gray-600">Staff</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-gray-600">Revenue</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-gray-600">Collection %</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-gray-600">Capacity %</th>
-                      <th className="text-center px-4 py-2.5 font-semibold text-gray-600">Plan</th>
-                      <th className="text-center px-4 py-2.5 font-semibold text-gray-600">Actions</th>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Institution</th>
+                      <th className="text-left py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Type</th>
+                      <th className="text-right py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Enrollment</th>
+                      <th className="text-right py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Staff</th>
+                      <th className="text-center py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Plan</th>
+                      <th className="text-center py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Status</th>
+                      <th className="text-right py-3.5 px-4 font-bold text-gray-500 uppercase tracking-tighter">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    <SchoolTableRow initial="SA" name="Sunrise Academy" city="Harare" type="Main Campus" enrollment={847} staff={72} revenue="$485,000" collection="83.8%" capacity={85} plan="Enterprise" color="rgb(13, 148, 136)" />
-                    <SchoolTableRow initial="GI" name="Greenfield International School" city="Harare" type="Main Campus" enrollment={678} staff={62} revenue="$520,000" collection="88.1%" capacity={85} plan="Ultimate" color="rgb(5, 150, 105)" />
-                    <SchoolTableRow initial="HP" name="Heritage Preparatory School" city="Harare" type="Main Campus" enrollment={534} staff={45} revenue="$312,000" collection="85.6%" capacity={89} plan="Professional" color="rgb(29, 78, 216)" />
-                    <SchoolTableRow initial="SA" name="Sunrise Academy - Borrowdale" city="Harare" type="Branch" enrollment={423} staff={38} revenue="$245,000" collection="86.9%" capacity={85} plan="Enterprise" color="rgb(13, 148, 136)" />
-                    <SchoolTableRow initial="SA" name="Sunrise Academy - Bulawayo" city="Bulawayo" type="Branch" enrollment={312} staff={28} revenue="$168,000" collection="85.4%" capacity={69} plan="Professional" color="rgb(13, 148, 136)" />
-                    <SchoolTableRow initial="HP" name="Heritage Prep - Chitungwiza" city="Chitungwiza" type="Satellite" enrollment={198} staff={18} revenue="$89,000" collection="79.2%" capacity={66} plan="Starter" color="rgb(29, 78, 216)" />
-                    <SchoolTableRow initial="LS" name="Little Stars ECD Centre" city="Harare" type="Main Campus" enrollment={145} staff={22} revenue="$78,000" collection="84.6%" capacity={81} plan="Starter" color="rgb(236, 72, 153)" />
+                    {filteredSchools.map((school: any) => (
+                      <tr key={school.id} className="hover:bg-gray-50/50 transition-colors group">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                              {school.name?.[0]}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-800">{school.name}</p>
+                              <div className="flex items-center gap-1 text-[9px] text-gray-400 uppercase font-bold">
+                                <MapPin className="w-2.5 h-2.5" /> {school.city}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-bold uppercase">
+                            {school.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-gray-700">
+                          {school.enrollment?.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-500">
+                          {school.staff}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[9px] font-bold uppercase">
+                            {school.plan}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold uppercase tracking-tighter shadow-sm">
+                            {school.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-blue-600 transition-colors"><Eye className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => handleDelete(school.id)} className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-rose-600 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            {/* Bottom Revenue and Alerts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <h3 className="text-sm font-semibold text-gray-800 mb-4">Revenue by School</h3>
-                <div className="space-y-3">
-                  <RevenueProgress initial="GI" name="Greenfield International School" amount="$520,000" percent={27.4} color="rgb(5, 150, 105)" />
-                  <RevenueProgress initial="SA" name="Sunrise Academy" amount="$485,000" percent={25.6} color="rgb(13, 148, 136)" />
-                  <RevenueProgress initial="HP" name="Heritage Preparatory School" amount="$312,000" percent={16.4} color="rgb(29, 78, 216)" />
-                  <RevenueProgress initial="SA" name="Sunrise Academy - Borrowdale" amount="$245,000" percent={12.9} color="rgb(13, 148, 136)" />
-                  <RevenueProgress initial="SA" name="Sunrise Academy - Bulawayo" amount="$168,000" percent={8.9} color="rgb(13, 148, 136)" />
-                  <RevenueProgress initial="HP" name="Heritage Prep - Chitungwiza" amount="$89,000" percent={4.7} color="rgb(29, 78, 216)" />
-                  <RevenueProgress initial="LS" name="Little Stars ECD Centre" amount="$78,000" percent={4.1} color="rgb(236, 72, 153)" />
-                </div>
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-600">Total Platform Revenue</span>
-                  <span className="text-sm font-bold text-gray-800">$1,897,000</span>
-                </div>
+            ) : (
+              <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-2xl">
+                <Building2 className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                <p className="text-sm text-gray-400 font-medium">No registered institutions.</p>
+                <p className="text-xs text-gray-300 mt-1">Start by provisioning a new school node.</p>
               </div>
-
-              <div className="bg-white rounded-xl border border-gray-100 p-5">
-                <h3 className="text-sm font-semibold text-gray-800 mb-4">Alerts & Insights</h3>
-                <div className="space-y-2.5">
-                  <AlertItem 
-                    icon={<TriangleAlert className="w-3.5 h-3.5 text-amber-600" />} 
-                    title="Pending Setup" 
-                    desc="Masvingo Community School needs configuration" 
-                    color="bg-amber-50" 
-                    titleColor="text-amber-800" 
-                    descColor="text-amber-700" 
-                  />
-                  <AlertItem 
-                    icon={<TrendingDown className="w-3.5 h-3.5 text-red-600" />} 
-                    title="Low Fee Collection" 
-                    desc="Heritage Prep - Chitungwiza at 79.2% collection rate" 
-                    color="bg-red-50" 
-                    titleColor="text-red-800" 
-                    descColor="text-red-700" 
-                  />
-                  <AlertItem 
-                    icon={<CircleCheck className="w-3.5 h-3.5 text-green-600" />} 
-                    title="Top Performer" 
-                    desc="Greenfield International leads with 88.1% fee collection and 82.8% academic performance" 
-                    color="bg-green-50" 
-                    titleColor="text-green-800" 
-                    descColor="text-green-700" 
-                  />
-                  <AlertItem 
-                    icon={<Award className="w-3.5 h-3.5 text-purple-600" />} 
-                    title="Growth Leader" 
-                    desc="Sunrise Borrowdale added 42 new admissions this term (+10.5%)" 
-                    color="bg-purple-50" 
-                    titleColor="text-purple-800" 
-                    descColor="text-purple-700" 
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -284,200 +312,23 @@ export default function MultiSchoolPage() {
   );
 }
 
-function StatCard({ label, value, trend, icon, color, textColor }: any) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-sm transition-all group">
-      <div className="flex items-center justify-between mb-2">
-        <span className={`px-2 py-1 rounded-lg text-[10px] font-semibold ${color} ${textColor}`}>{label}</span>
-        <span className="text-[10px] font-medium flex items-center gap-0.5 text-green-600">
-          <TrendingUp className="w-2.5 h-2.5" /> {trend}
-        </span>
-      </div>
-      <div className="flex items-end justify-between">
-        <p className="text-xl font-bold text-gray-800">{value}</p>
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color}`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MiniInsightCard({ label, value, trend, color, textColor, icon }: any) {
+function StatCard({ icon, label, value, color, trend }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all group">
-      <div className="flex items-center justify-between mb-2">
-        <span className={`px-2 py-1 rounded-lg text-[10px] font-semibold ${color} ${textColor}`}>{label}</span>
-        <span className="text-[10px] font-medium text-green-600 flex items-center gap-0.5">
-          <TrendingUp className="w-2.5 h-2.5" /> {trend}
-        </span>
+      <div className="flex items-center justify-between mb-3">
+        <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm`}>{icon}</div>
+        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{trend}</span>
       </div>
-      <div className="flex items-end justify-between">
-        <p className="text-2xl font-bold text-gray-800">{value}</p>
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-          {icon}
-        </div>
-      </div>
+      <p className="text-xl font-bold text-gray-800">{value}</p>
+      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-0.5">{label}</p>
     </div>
   );
 }
 
-function TabButton({ active, onClick, icon, label, badge }: any) {
+function TabButton({ active, onClick, label }: any) {
   return (
-    <button 
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-        active 
-          ? 'border-teal-600 text-teal-600' 
-          : 'border-transparent text-gray-500 hover:text-gray-700'
-      }`}
-    >
-      {icon}
+    <button onClick={onClick} className={`px-4 py-3 text-xs font-bold uppercase tracking-tighter border-b-2 transition-colors whitespace-nowrap ${active ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
       {label}
-      {badge && (
-        <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
-          active ? 'bg-teal-100 text-teal-600' : 'bg-gray-100 text-gray-600'
-        }`}>
-          {badge}
-        </span>
-      )}
     </button>
-  );
-}
-
-function TrendRow({ month, values }: any) {
-  const maxValue = 847; // Max enrollment for scaling
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-[10px] text-gray-500 w-8 text-right font-medium">{month}</span>
-      <div className="flex-1 flex gap-1">
-        {values.map((v: number, i: number) => (
-          <div key={i} className="flex-1 group relative">
-            <div className="h-5 bg-gray-50 rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-500" 
-                style={{ 
-                  width: `${(v / maxValue) * 100}%`, 
-                  backgroundColor: i === 0 ? 'rgb(13, 148, 136)' : i === 1 ? 'rgb(124, 58, 237)' : 'rgb(5, 150, 105)' 
-                }}
-              />
-            </div>
-            <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap z-10">
-              {v}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LegendItem({ color, label }: any) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-      <span className="text-[10px] text-gray-600">{label}</span>
-    </div>
-  );
-}
-
-function StatusItem({ initial, name, pupils, status, color, statusColor = "bg-emerald-100 text-emerald-700" }: any) {
-  return (
-    <button className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors text-left group">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-bold" style={{ backgroundColor: color }}>
-        {initial}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-gray-800 truncate">{name}</p>
-        <p className="text-[10px] text-gray-500">{pupils} pupils</p>
-      </div>
-      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${statusColor}`}>
-        {status}
-      </span>
-    </button>
-  );
-}
-
-function SchoolTableRow({ initial, name, city, type, enrollment, staff, revenue, collection, capacity, plan, color }: any) {
-  const capColor = capacity > 80 ? 'bg-amber-500' : 'bg-green-500';
-  return (
-    <tr className="hover:bg-gray-50/50 transition-colors">
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[9px] font-bold" style={{ backgroundColor: color }}>
-            {initial}
-          </div>
-          <div>
-            <p className="font-medium text-gray-800">{name}</p>
-            <p className="text-[10px] text-gray-500">{city}</p>
-          </div>
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">{type}</span>
-      </td>
-      <td className="px-4 py-3 text-right font-semibold text-gray-800">{enrollment}</td>
-      <td className="px-4 py-3 text-right text-gray-600">{staff}</td>
-      <td className="px-4 py-3 text-right font-semibold text-gray-800">{revenue}</td>
-      <td className="px-4 py-3 text-right">
-        <span className={`font-medium ${parseFloat(collection) < 80 ? 'text-red-600' : 'text-green-600'}`}>{collection}</span>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${capColor}`} style={{ width: `${capacity}%` }} />
-          </div>
-          <span className="text-[10px] text-gray-500">{capacity}%</span>
-        </div>
-      </td>
-      <td className="px-4 py-3 text-center">
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-          plan === 'Enterprise' ? 'bg-purple-100 text-purple-700' : 
-          plan === 'Ultimate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-        }`}>
-          {plan}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-center">
-        <button className="p-1.5 rounded-lg hover:bg-teal-50 text-gray-400 hover:text-teal-600 transition-colors">
-          <Eye className="w-3.5 h-3.5" />
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-function RevenueProgress({ initial, name, amount, percent, color }: any) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-6 h-6 rounded flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0" style={{ backgroundColor: color }}>
-        {initial}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-medium text-gray-700 truncate">{name}</span>
-          <span className="text-[10px] font-semibold text-gray-800">{amount}</span>
-        </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full rounded-full transition-all duration-500" 
-            style={{ width: `${percent}%`, backgroundColor: color }} 
-          />
-        </div>
-      </div>
-      <span className="text-[10px] text-gray-500 w-10 text-right">{percent}%</span>
-    </div>
-  );
-}
-
-function AlertItem({ icon, title, desc, color, titleColor, descColor }: any) {
-  return (
-    <div className={`flex items-start gap-2.5 p-3 ${color} rounded-lg transition-transform hover:scale-[1.01] cursor-pointer`}>
-      <div className="mt-0.5 flex-shrink-0">{icon}</div>
-      <div>
-        <p className={`text-xs font-medium ${titleColor}`}>{title}</p>
-        <p className={`text-[10px] ${descColor} mt-0.5`}>{desc}</p>
-      </div>
-    </div>
   );
 }

@@ -6,19 +6,43 @@ import {
   Shield, 
   Search, 
   UserCircle, 
-  MoreVertical, 
   Trash2, 
   Loader2,
-  Lock,
   Mail,
-  Calendar
+  Calendar,
+  Plus,
+  Database,
+  UserPlus,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
-import { ref, remove } from 'firebase/database';
+import { ref, remove, set, serverTimestamp } from 'firebase/database';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 export default function UsersRBACPage() {
   const [search, setSearch] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const database = useDatabase();
   const { toast } = useToast();
   const { data: users, loading } = useRTDBCollection(database, 'users');
@@ -31,11 +55,46 @@ export default function UsersRBACPage() {
     );
   }, [users, search]);
 
+  const stats = useMemo(() => {
+    return {
+      admins: users.filter(u => u.role === 'admin').length,
+      staff: users.filter(u => u.role === 'staff').length,
+      parents: users.filter(u => u.role === 'parent').length,
+    };
+  }, [users]);
+
+  const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    // For demo/simulated registration we use email-based ID if not using real auth creation here
+    // In a real app, this would invite the user or create the record after Auth creation
+    const tempId = email.replace(/[.@]/g, '_'); 
+
+    const data = {
+      displayName: formData.get('name'),
+      email: email,
+      role: formData.get('role'),
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await set(ref(database, `users/${tempId}`), data);
+      setIsAddOpen(false);
+      toast({ title: "User Added", description: `${data.displayName} has been assigned the ${data.role} role.` });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to add user account.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteUser = async (uid: string) => {
     if (!confirm('Are you sure you want to remove this user from the platform?')) return;
     try {
       await remove(ref(database, `users/${uid}`));
-      toast({ title: "User Removed", description: "The platform access for this user has been revoked." });
+      toast({ title: "User Removed", description: "Access revoked successfully." });
     } catch (e) {
       toast({ title: "Error", description: "Failed to remove user account.", variant: "destructive" });
     }
@@ -43,49 +102,108 @@ export default function UsersRBACPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
-        <div className="absolute right-4 top-4 opacity-10">
-          <Shield className="w-32 h-32" />
+      {/* High-Fidelity Header */}
+      <div className="bg-gradient-to-r from-[#1E3A5F] via-indigo-600 to-indigo-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <svg viewBox="0 0 400 200" className="w-full h-full">
+            <circle cx="350" cy="30" r="80" fill="white" />
+            <circle cx="100" cy="180" r="120" fill="white" />
+          </svg>
         </div>
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
             <Shield className="w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Users & Role Based Access</h2>
-            <p className="text-sm text-white/80 mt-1">Manage institutional access control and user registrations.</p>
+            <h2 className="text-xl font-bold">Identity & Access Control</h2>
+            <p className="text-sm text-white/80 mt-1">Manage institutional roles, permissions, and platform users</p>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 backdrop-blur-md">
+              <Database className="w-3.5 h-3.5" /> RBAC Active
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <RBACStat icon={<ShieldCheck className="w-4 h-4 text-rose-600" />} label="Administrators" value={loading ? '...' : stats.admins.toString()} color="bg-rose-50" />
+        <RBACStat icon={<UserCircle className="w-4 h-4 text-blue-600" />} label="Staff Users" value={loading ? '...' : stats.staff.toString()} color="bg-blue-50" />
+        <RBACStat icon={<UserPlus className="w-4 h-4 text-emerald-600" />} label="Parent Users" value={loading ? '...' : stats.parents.toString()} color="bg-emerald-50" />
+        <RBACStat icon={<ShieldAlert className="w-4 h-4 text-amber-600" />} label="Total Registered" value={loading ? '...' : users.length.toString()} color="bg-amber-50" />
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col sm:flex-row gap-3 items-center justify-between shadow-sm">
+        <div className="relative flex-1 w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <input 
             type="text" 
-            placeholder="Search users by name, email or role..." 
-            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+            placeholder="Search directory by name, email or role..." 
+            className="w-full pl-9 pr-4 py-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500 bg-white" 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 h-9 text-xs font-bold gap-1.5 shadow-sm px-4">
+              <Plus className="h-3.5 w-3.5" /> Invite User
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <form onSubmit={handleAddUser}>
+              <DialogHeader>
+                <DialogTitle>Register Platform Account</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input name="name" placeholder="John Nyathi" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <Input name="email" type="email" placeholder="john@school.edu" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Assign System Role</Label>
+                  <Select name="role" defaultValue="staff">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="staff">Staff/Teacher</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600">
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Confirm Registration
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-20 flex flex-col items-center justify-center gap-3">
             <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-            <p className="text-xs text-gray-400 italic">Syncing user directory...</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">Verifying Identity Cloud...</p>
           </div>
         ) : filteredUsers.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User Details</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Platform Role</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Registered On</th>
-                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
+                <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                  <th className="px-6 py-4">User Identity</th>
+                  <th className="px-6 py-4">Access Level</th>
+                  <th className="px-6 py-4 text-center">Registration</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -93,19 +211,19 @@ export default function UsersRBACPage() {
                   <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                          <UserCircle className="w-6 h-6" />
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs shadow-inner">
+                          {user.displayName?.split(' ').map((n: string) => n[0]).join('') || '??'}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-gray-800">{user.displayName || 'No Name'}</p>
-                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                          <p className="text-xs font-bold text-gray-800 leading-tight">{user.displayName || 'No Name'}</p>
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
                             <Mail className="w-2.5 h-2.5" /> {user.email}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
+                      <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wide border shadow-sm ${
                         user.role === 'admin' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
                         user.role === 'staff' ? 'bg-teal-50 text-teal-600 border-teal-100' : 
                         'bg-blue-50 text-blue-600 border-blue-100'
@@ -113,10 +231,10 @@ export default function UsersRBACPage() {
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <Calendar className="w-3.5 h-3.5 text-gray-300" />
-                        {new Date(user.createdAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    <td className="px-6 py-4 text-center">
+                      <div className="inline-flex items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+                        <Calendar className="w-3 h-3 text-gray-300" />
+                        {new Date(user.createdAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -130,11 +248,24 @@ export default function UsersRBACPage() {
             </table>
           </div>
         ) : (
-          <div className="p-20 text-center">
-            <p className="text-sm text-gray-400 italic">No users matching your search criteria were found.</p>
+          <div className="p-20 text-center text-gray-400 italic text-xs">
+            No users found matching your search.
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function RBACStat({ icon, label, value, color }: any) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all group">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm`}>{icon}</div>
+        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Active</span>
+      </div>
+      <p className="text-xl font-bold text-gray-800">{value}</p>
+      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-0.5">{label}</p>
     </div>
   );
 }
