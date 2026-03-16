@@ -47,17 +47,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from '@/components/ui/button';
 import { notificationService } from '@/services/notifications';
 import { AppNotification } from '@/lib/types';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const database = useDatabase();
   const { profile, loading } = useUserProfile();
+  const { toast } = useToast();
   const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
   
-  // Fetch collections for real-time counts
   const { data: admissions } = useRTDBCollection(database, 'admissions');
   const { data: announcements } = useRTDBCollection(database, 'announcements');
   const { data: notifications } = useRTDBCollection<AppNotification>(database, profile?.uid ? `notifications/${profile.uid}` : null);
@@ -66,7 +67,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Protected Routes Check
+  // Push Notification Logic
+  useEffect(() => {
+    if (!profile?.uid || typeof window === 'undefined') return;
+
+    const setupNotifications = async () => {
+      try {
+        const messaging = getMessaging();
+        
+        // Request permission
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          // Get FCM Token
+          // Note: In a production environment, you need a VAPID key from the Firebase Console
+          const token = await getToken(messaging, { 
+            vapidKey: undefined // Replace with your real VAPID key
+          });
+
+          if (token) {
+            await notificationService.registerFCMToken(database, profile.uid, token);
+            console.log('FCM Token registered:', token);
+          }
+        }
+
+        // Handle foreground messages
+        onMessage(messaging, (payload) => {
+          console.log('Foreground message received:', payload);
+          toast({
+            title: payload.notification?.title || 'New Notification',
+            description: payload.notification?.body,
+          });
+        });
+
+      } catch (error) {
+        console.error('Error setting up push notifications:', error);
+      }
+    };
+
+    setupNotifications();
+  }, [profile?.uid, database, toast]);
+
   useEffect(() => {
     if (!profile && !loading) {
       router.push('/');
@@ -93,18 +133,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const newAdmissionsCount = useMemo(() => {
-    return admissions.filter(a => a.status === 'New').length;
+    return (admissions || []).filter(a => a.status === 'New').length;
   }, [admissions]);
 
   const announcementsCount = useMemo(() => {
-    return announcements.length;
+    return (announcements || []).length;
   }, [announcements]);
 
   const unreadNotifications = useMemo(() => {
-    return notifications.filter(n => !n.read).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return (notifications || []).filter(n => !n.read).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [notifications]);
 
-  // Apply dynamic primary color
   const primaryColor = schoolSettings?.primaryColor || '#0D9488';
 
   if (loading) {
@@ -389,8 +428,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </button>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto custom-scrollbar divide-y divide-gray-50">
-                  {notifications.length > 0 ? (
-                    notifications.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((n) => (
+                  {(notifications || []).length > 0 ? (
+                    (notifications || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((n) => (
                       <div 
                         key={n.id} 
                         className={`p-4 hover:bg-gray-50 transition-colors relative group ${!n.read ? 'bg-blue-50/30' : ''}`}
@@ -422,7 +461,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   )}
                 </div>
-                {notifications.length > 0 && (
+                {(notifications || []).length > 0 && (
                   <div className="p-2 bg-gray-50/50 border-t border-gray-100 text-center">
                     <button 
                       onClick={() => notificationService.clearNotifications(database, profile.uid)}

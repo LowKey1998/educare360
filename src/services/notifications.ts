@@ -1,17 +1,33 @@
 
-import { Database, ref, push, update, remove, serverTimestamp, get, query, orderByChild, equalTo } from 'firebase/database';
+import { Database, ref, push, update, remove, serverTimestamp, get, set } from 'firebase/database';
 import { AppNotification } from '@/lib/types';
 
 export const notificationService = {
   /**
-   * Adds a notification for a specific user.
+   * Registers or updates an FCM token for a user.
+   */
+  async registerFCMToken(db: Database, userId: string, token: string) {
+    // We store tokens in a map to support multiple devices per user
+    const tokenHash = token.replace(/[.#$/[\]]/g, '_');
+    return set(ref(db, `users/${userId}/fcmTokens/${tokenHash}`), {
+      token,
+      lastUpdated: serverTimestamp()
+    });
+  },
+
+  /**
+   * Adds a notification for a specific user in the database.
    */
   async notifyUser(db: Database, userId: string, data: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) {
-    return push(ref(db, `notifications/${userId}`), {
+    const notificationRef = await push(ref(db, `notifications/${userId}`), {
       ...data,
       read: false,
       createdAt: serverTimestamp()
     });
+
+    // In a real production environment, you would trigger a Cloud Function here
+    // that reads users/${userId}/fcmTokens and sends a real Push Notification via FCM Admin SDK.
+    return notificationRef;
   },
 
   /**
@@ -59,14 +75,7 @@ export const notificationService = {
     return remove(ref(db, `notifications/${userId}`));
   },
 
-  /**
-   * Simulates resending a portal invitation.
-   * In a real app, this would trigger an email via an Edge Function.
-   */
   async resendPortalInvite(db: Database, email: string) {
-    // Log the event in the system audit log or notifications
-    // Since the user might not have a UID yet, we track these by email-hashed keys if needed
-    // For now, we simulate success and log it to admins
     return this.notifyRole(db, 'admin', {
       title: 'Portal Invite Resent',
       message: `A portal registration link was resent to ${email}.`,
