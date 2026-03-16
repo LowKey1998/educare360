@@ -14,7 +14,9 @@ import {
   ArrowUpRight,
   ClipboardList,
   Mail,
-  Clock
+  Clock,
+  UserCheck,
+  Loader2
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
 import { 
@@ -35,6 +37,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { admissionService } from '@/services/admissions';
+import { studentService } from '@/services/students';
 import { Admission } from '@/lib/types';
 
 const STATUS_CONFIG: Record<string, { color: string, dot: string, bg: string }> = {
@@ -51,7 +54,9 @@ const STATUS_LABELS = ['New', 'Under Review', 'Interview', 'Accepted', 'Waitlist
 export default function AdmissionsPage() {
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEnrollOpen, setIsEnrollOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<Admission | null>(null);
   
   const database = useDatabase();
   const { profile } = useUserProfile();
@@ -109,6 +114,35 @@ export default function AdmissionsPage() {
     }
   };
 
+  const handleEnrollment = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (!isAdmin || !selectedApp) return;
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    
+    const studentData: any = {
+      studentName: selectedApp.studentName,
+      grade: selectedApp.grade,
+      admissionNo: formData.get('admNo'),
+      gender: formData.get('gender'),
+      guardianName: formData.get('guardianName'),
+      guardianPhone: formData.get('guardianPhone'),
+      parentEmail: formData.get('parentEmail'),
+      status: 'Active',
+    };
+
+    try {
+      await studentService.enrollFromAdmission(database, selectedApp.id, studentData);
+      setIsEnrollOpen(false);
+      setSelectedApp(null);
+      toast({ title: "Enrollment Complete", description: `${selectedApp.studentName} is now an active pupil.` });
+    } catch (e) {
+      toast({ title: "Error", description: "Enrollment failed.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const updateStatus = async (id: string, newStatus: string) => {
     if (!isAdmin) return;
     try {
@@ -138,11 +172,11 @@ export default function AdmissionsPage() {
           </div>
           <div>
             <h2 className="text-xl font-bold">Admissions & Enrolment</h2>
-            <p className="text-sm text-white/80 mt-1">Manage pupil applications, selection pipeline and placement</p>
+            <p className="text-sm text-white/80 mt-1">Manage pupil applications and transition accepted candidates to active pupils</p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-2">
             <div className="px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 backdrop-blur-md">
-              <Database className="w-3 h-3" /> Sync Active
+              <Database className="w-3 h-3" /> Registry Sync
             </div>
           </div>
         </div>
@@ -234,7 +268,7 @@ export default function AdmissionsPage() {
                     {isAdmin && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Select onValueChange={(val) => updateStatus(app.id, val)}>
-                          <SelectTrigger className="h-6 w-6 p-0 border-none bg-transparent">
+                          <SelectTrigger className="h-6 w-6 p-0 border-none bg-transparent outline-none">
                             <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
                           </SelectTrigger>
                           <SelectContent>
@@ -249,6 +283,22 @@ export default function AdmissionsPage() {
                   </div>
                   <p className="text-xs font-bold text-gray-800 mb-1">{app.studentName}</p>
                   <p className="text-[10px] text-gray-500 font-medium">{app.grade} • Age {app.age}</p>
+                  
+                  {label === 'Accepted' && isAdmin && !app.enrolledId && (
+                    <button 
+                      onClick={() => { setSelectedApp(app); setIsEnrollOpen(true); }}
+                      className="mt-3 w-full py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <UserCheck className="h-3 w-3" /> Process Enrollment
+                    </button>
+                  )}
+
+                  {app.enrolledId && (
+                    <div className="mt-3 py-1 bg-gray-50 text-gray-400 text-[9px] font-bold rounded-lg border border-gray-100 text-center uppercase tracking-widest flex items-center justify-center gap-1">
+                      <Database className="h-2.5 w-2.5" /> Enrolled in Registry
+                    </div>
+                  )}
+
                   <div className="mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-between">
                     <span className="text-[9px] text-gray-400 font-bold uppercase">{app.submissionDate}</span>
                     {app.docsPending && <span className="text-[9px] text-rose-500 font-bold bg-rose-50 px-1.5 py-0.5 rounded">PENDING DOCS</span>}
@@ -259,6 +309,68 @@ export default function AdmissionsPage() {
           </div>
         ))}
       </div>
+
+      {/* Enrollment Processing Dialog */}
+      <Dialog open={isEnrollOpen} onOpenChange={setIsEnrollOpen}>
+        <DialogContent className="max-w-lg">
+          <form onSubmit={handleEnrollment}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-emerald-600" />
+                Finalize Institutional Enrollment
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl mb-2">
+                <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Application Summary</p>
+                <div className="flex justify-between text-xs">
+                  <span className="font-bold text-gray-700">{selectedApp?.studentName}</span>
+                  <span className="text-blue-600 font-bold">{selectedApp?.grade}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Admission Number</Label>
+                  <Input name="admNo" placeholder="e.g. 2026-001" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <Select name="gender" defaultValue="Male">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Guardian Name</Label>
+                  <Input name="guardianName" placeholder="Full name" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Guardian Phone</Label>
+                  <Input name="guardianPhone" placeholder="+263..." required />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Parent Email (for Portal access)</Label>
+                <Input name="parentEmail" type="email" placeholder="parent@example.com" required />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Database className="h-4 w-4 mr-2" />}
+                Confirm Institutional Enrollment
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
