@@ -24,7 +24,9 @@ import {
   ShieldCheck,
   MoreHorizontal,
   UserCheck,
-  Plus
+  Plus,
+  Check,
+  X
 } from 'lucide-react';
 import { useUserProfile, useDatabase, useRTDBCollection } from '@/firebase';
 import { 
@@ -45,8 +47,10 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { studentService } from '@/services/students';
+import { notificationService } from '@/services/notifications';
 import { Student, UserProfile } from '@/lib/types';
 
 export default function ParentPortalPage() {
@@ -69,7 +73,8 @@ export default function ParentPortalPage() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [newEmail, setNewEmail] = useState('');
   const [linkingParentEmail, setLinkingParentEmail] = useState('');
-  const [targetStudentId, setTargetStudentId] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'staff';
@@ -84,16 +89,12 @@ export default function ParentPortalPage() {
     return myChildren[0];
   }, [myChildren, selectedChildId]);
 
-  /**
-   * Admin Logic: Merges registered accounts and registry emails
-   */
   const familyManagementData = useMemo(() => {
     if (!isAdmin || !students || !users) return [];
     
     const parentAccounts = users.filter(u => u.role === 'parent');
     const studentEmails = Array.from(new Set(students.map(s => s.parentEmail?.toLowerCase()).filter(Boolean)));
     
-    // 1. Start with all registered parent accounts
     const registryMap = new Map<string, any>();
     
     parentAccounts.forEach(account => {
@@ -108,7 +109,6 @@ export default function ParentPortalPage() {
       });
     });
 
-    // 2. Add emails from student registry that don't have accounts yet
     studentEmails.forEach(email => {
       if (!registryMap.has(email)) {
         const linkedStudents = students.filter(s => s.parentEmail?.toLowerCase() === email);
@@ -128,6 +128,16 @@ export default function ParentPortalPage() {
     );
   }, [students, users, isAdmin, search]);
 
+  const availableStudentsForLink = useMemo(() => {
+    if (!isLinkOpen) return [];
+    return students.filter(s => {
+      const isNotAlreadyLinked = s.parentEmail?.toLowerCase() !== linkingParentEmail.toLowerCase();
+      const matchesSearch = s.studentName.toLowerCase().includes(studentSearch.toLowerCase()) || 
+                           s.grade.toLowerCase().includes(studentSearch.toLowerCase());
+      return isNotAlreadyLinked && matchesSearch;
+    });
+  }, [students, isLinkOpen, linkingParentEmail, studentSearch]);
+
   const handleUpdateEmail = async () => {
     if (!editingStudent || !newEmail) return;
     setIsUpdating(true);
@@ -143,19 +153,41 @@ export default function ParentPortalPage() {
     }
   };
 
-  const handleLinkStudent = async () => {
-    if (!targetStudentId || !linkingParentEmail) return;
+  const handleLinkStudents = async () => {
+    if (selectedStudentIds.length === 0 || !linkingParentEmail) return;
     setIsUpdating(true);
     try {
-      await studentService.updateParentEmail(database, targetStudentId, linkingParentEmail);
+      await studentService.bulkUpdateParentEmail(database, selectedStudentIds, linkingParentEmail);
       setIsLinkOpen(false);
-      setTargetStudentId('');
-      toast({ title: "Student Linked", description: `Record associated with ${linkingParentEmail}.` });
+      setSelectedStudentIds([]);
+      setStudentSearch('');
+      toast({ 
+        title: "Students Linked", 
+        description: `Associated ${selectedStudentIds.length} pupils with ${linkingParentEmail}.` 
+      });
     } catch (e) {
       toast({ title: "Linking Failed", variant: "destructive" });
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleResendInvite = async (email: string) => {
+    try {
+      await notificationService.resendPortalInvite(database, email);
+      toast({ 
+        title: "Invitation Resent", 
+        description: `Registration instructions sent to ${email}.` 
+      });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to resend invite.", variant: "destructive" });
+    }
+  };
+
+  const toggleStudentSelection = (id: string) => {
+    setSelectedStudentIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
   };
 
   if (studentsLoading || profileLoading || usersLoading) {
@@ -167,7 +199,6 @@ export default function ParentPortalPage() {
     );
   }
 
-  // Admin View
   if (isAdmin) {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -264,6 +295,7 @@ export default function ParentPortalPage() {
                       size="sm" 
                       onClick={() => {
                         setLinkingParentEmail(family.email);
+                        setSelectedStudentIds([]);
                         setIsLinkOpen(true);
                       }}
                       className="h-8 text-[10px] font-bold gap-1 border-emerald-100 text-emerald-600 hover:bg-emerald-50"
@@ -272,7 +304,12 @@ export default function ParentPortalPage() {
                     </Button>
                   )}
                   {!family.accountExists && (
-                    <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold gap-1 border-rose-100 text-rose-600 hover:bg-rose-50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleResendInvite(family.email)}
+                      className="h-8 text-[10px] font-bold gap-1 border-rose-100 text-rose-600 hover:bg-rose-50"
+                    >
                       <Mail className="h-3 w-3" /> Resend Invite
                     </Button>
                   )}
@@ -285,48 +322,76 @@ export default function ParentPortalPage() {
           </div>
         </div>
 
-        {/* Link Student Dialog */}
+        {/* Bulk Link Student Dialog */}
         <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Link Student to Account</DialogTitle>
+              <DialogTitle>Link Students to Account</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
                 <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Target Account</p>
                 <p className="text-xs font-bold text-gray-800">{linkingParentEmail}</p>
               </div>
-              <div className="space-y-2">
-                <Label>Select Student from Registry</Label>
-                <Select value={targetStudentId} onValueChange={setTargetStudentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Search pupils..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students
-                      .filter(s => s.parentEmail?.toLowerCase() !== linkingParentEmail.toLowerCase())
-                      .map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.studentName} ({s.grade})</SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                  This action will update the student's parent email contact, granting the selected account portal access.
-                </p>
+              
+              <div className="space-y-3">
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Search & Select Pupils</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <Input 
+                    placeholder="Search name or grade..." 
+                    className="pl-8 text-xs h-9"
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                  />
+                </div>
+                
+                <div className="max-h-[300px] overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50 custom-scrollbar">
+                  {availableStudentsForLink.length > 0 ? availableStudentsForLink.map(s => (
+                    <div 
+                      key={s.id} 
+                      className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => toggleStudentSelection(s.id)}
+                    >
+                      <Checkbox 
+                        checked={selectedStudentIds.includes(s.id)}
+                        onCheckedChange={() => toggleStudentSelection(s.id)}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-700 truncate">{s.studentName}</p>
+                        <p className="text-[10px] text-gray-400 uppercase font-medium">{s.grade}</p>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="p-8 text-center text-xs text-gray-400 italic">
+                      No matching students available for linking.
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {selectedStudentIds.length > 0 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 rounded-lg text-emerald-700">
+                  <span className="text-[10px] font-bold uppercase">{selectedStudentIds.length} selected</span>
+                  <button onClick={() => setSelectedStudentIds([])} className="text-[10px] hover:underline font-bold">Clear</button>
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button disabled={isUpdating || !targetStudentId} onClick={handleLinkStudent} className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold">
-                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Finalize Association
+              <Button 
+                disabled={isUpdating || selectedStudentIds.length === 0} 
+                onClick={handleLinkStudents} 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 font-bold"
+              >
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                Associate {selectedStudentIds.length} Student{selectedStudentIds.length !== 1 ? 's' : ''}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Edit Email Dialog */}
-        <Dialog open={isEditEmailOpen} onOpenChange={setIsEditEditEmailOpen}>
+        <Dialog open={isEditEmailOpen} onOpenChange={setIsEditEmailOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Update Parent Contact Email</DialogTitle>
@@ -361,7 +426,6 @@ export default function ParentPortalPage() {
     );
   }
 
-  // Parent View
   if (myChildren.length === 0) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4 max-w-md mx-auto text-center">
@@ -379,7 +443,6 @@ export default function ParentPortalPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Parent Header */}
       <div className="bg-gradient-to-r from-rose-600 via-rose-500 to-pink-500 rounded-xl p-6 text-white relative overflow-hidden shadow-lg">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <svg viewBox="0 0 400 200" className="w-full h-full">

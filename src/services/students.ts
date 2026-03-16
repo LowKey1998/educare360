@@ -54,5 +54,21 @@ export const studentService = {
       parentEmail: email.toLowerCase().trim(),
       lastRegistryUpdate: serverTimestamp()
     });
+  },
+
+  /**
+   * Updates the parent contact email for multiple students (Bulk Link).
+   */
+  async bulkUpdateParentEmail(db: Database, studentIds: string[], email: string) {
+    const updates: any = {};
+    const normalizedEmail = email.toLowerCase().trim();
+    const now = serverTimestamp();
+
+    studentIds.forEach(id => {
+      updates[`students/${id}/parentEmail`] = normalizedEmail;
+      updates[`students/${id}/lastRegistryUpdate`] = now;
+    });
+
+    return update(ref(db), updates);
   }
 };

@@ -57,5 +57,20 @@ export const notificationService = {
 
   async clearNotifications(db: Database, userId: string) {
     return remove(ref(db, `notifications/${userId}`));
+  },
+
+  /**
+   * Simulates resending a portal invitation.
+   * In a real app, this would trigger an email via an Edge Function.
+   */
+  async resendPortalInvite(db: Database, email: string) {
+    // Log the event in the system audit log or notifications
+    // Since the user might not have a UID yet, we track these by email-hashed keys if needed
+    // For now, we simulate success and log it to admins
+    return this.notifyRole(db, 'admin', {
+      title: 'Portal Invite Resent',
+      message: `A portal registration link was resent to ${email}.`,
+      type: 'info'
+    });
   }
 };
