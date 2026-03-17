@@ -25,7 +25,9 @@ import {
   MoreHorizontal,
   Plus,
   Check,
-  X
+  X,
+  UserCircle,
+  Settings
 } from 'lucide-react';
 import { useUserProfile, useDatabase, useRTDBCollection, useRTDBDoc } from '@/firebase';
 import { 
@@ -43,7 +45,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { studentService } from '@/services/students';
 import { notificationService } from '@/services/notifications';
-import { Student, UserProfile } from '@/lib/types';
+import { userService } from '@/services/users';
+import { Student, UserProfile as UserProfileType } from '@/lib/types';
 
 export default function ParentPortalPage() {
   const { profile, loading: profileLoading } = useUserProfile();
@@ -51,19 +54,25 @@ export default function ParentPortalPage() {
   const { toast } = useToast();
   
   const { data: students, loading: studentsLoading } = useRTDBCollection<Student>(database, 'students');
-  const { data: users, loading: usersLoading } = useRTDBCollection<UserProfile>(database, 'users');
+  const { data: users, loading: usersLoading } = useRTDBCollection<UserProfileType>(database, 'users');
   const { data: announcements, loading: msgsLoading } = useRTDBCollection(database, 'announcements');
   const { data: schoolSettings } = useRTDBDoc(database, 'system_settings');
   
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   
-  // UI States
+  // Admin UI States
   const [isEditEmailOpen, setIsEditEmailOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [isEditAccountOpen, setIsEditAccountOpen] = useState(false);
+  
+  // Parent UI States
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   
   // Action States
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
   const [newEmail, setNewEmail] = useState('');
   const [linkingParentEmail, setLinkingParentEmail] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
@@ -98,7 +107,7 @@ export default function ParentPortalPage() {
         accountExists: true,
         displayName: account.displayName || 'Unnamed Parent',
         students: students.filter(s => s.parentEmail?.toLowerCase() === email),
-        userId: account.uid,
+        userId: account.id || account.uid,
         lastLogin: account.createdAt
       });
     });
@@ -165,6 +174,68 @@ export default function ParentPortalPage() {
     }
   };
 
+  const handleAddParentAccount = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    const email = (formData.get('email') as string).toLowerCase();
+
+    try {
+      await userService.registerParent(database, { displayName: name, email });
+      setIsAddAccountOpen(false);
+      toast({ title: "Account Provisioned", description: "The parent can now sign in with this email." });
+    } catch (e) {
+      toast({ title: "Failed to create account", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleEditParentAccount = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    setIsUpdating(true);
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    const email = (formData.get('email') as string).toLowerCase();
+
+    try {
+      await userService.updateParentProfile(database, editingAccount.userId, editingAccount.email, {
+        displayName: name,
+        email
+      });
+      setIsEditAccountOpen(false);
+      setEditingAccount(null);
+      toast({ title: "Account Updated", description: "Profile and student links synchronized." });
+    } catch (e) {
+      toast({ title: "Update Failed", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdateMyProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!profile) return;
+    setIsUpdating(true);
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+
+    try {
+      await userService.updateParentProfile(database, profile.uid, profile.email || '', {
+        displayName: name,
+        email: profile.email || ''
+      });
+      setIsProfileOpen(false);
+      toast({ title: "Profile Updated" });
+    } catch (e) {
+      toast({ title: "Update Failed", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleResendInvite = async (email: string) => {
     try {
       await notificationService.resendPortalInvite(database, email);
@@ -205,9 +276,34 @@ export default function ParentPortalPage() {
               <p className="text-sm text-white/80 mt-1">Manage portal access, verify registrations, and audit parent-student links</p>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <div className="hidden md:flex px-3 py-1.5 bg-white/15 rounded-lg text-[10px] font-bold uppercase tracking-widest items-center gap-1.5 backdrop-blur-md">
-                <Database className="w-3.5 h-3.5" /> Registry Live
-              </div>
+              <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-white/20 hover:bg-white/30 text-white border-white/10 h-10 text-xs font-bold gap-1.5 shadow-lg backdrop-blur-md">
+                    <Plus className="h-3.5 w-3.5" /> Register Parent Account
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <form onSubmit={handleAddParentAccount}>
+                    <DialogHeader><DialogTitle>Register Parent Profile</DialogTitle></DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Full Name</Label>
+                        <Input name="name" placeholder="John Doe" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email Address</Label>
+                        <Input name="email" type="email" placeholder="parent@example.com" required />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={isUpdating} className="w-full bg-rose-600">
+                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Create Parent Record
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
@@ -220,7 +316,7 @@ export default function ParentPortalPage() {
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="relative flex-1 w-full max-w-md">
+            <div className="relative flex-1 w-full max-md:max-w-none max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <Input 
                 className="pl-9 text-xs h-9" 
@@ -240,7 +336,17 @@ export default function ParentPortalPage() {
                     {family.displayName[0]}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-gray-800 truncate">{family.displayName}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-gray-800 truncate">{family.displayName}</p>
+                      {family.accountExists && (
+                        <button 
+                          onClick={() => { setEditingAccount(family); setIsEditAccountOpen(true); }}
+                          className="p-1 text-gray-300 hover:text-rose-600 transition-colors"
+                        >
+                          <Edit2 className="h-2.5 w-2.5" />
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-[10px] text-gray-400 font-medium truncate">{family.email}</p>
                       {family.accountExists ? (
@@ -311,6 +417,31 @@ export default function ParentPortalPage() {
             )}
           </div>
         </div>
+
+        {/* Edit Account Details Dialog */}
+        <Dialog open={isEditAccountOpen} onOpenChange={setIsEditAccountOpen}>
+          <DialogContent>
+            <form onSubmit={handleEditParentAccount}>
+              <DialogHeader><DialogTitle>Edit Parent Account Details</DialogTitle></DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Parent Display Name</Label>
+                  <Input name="name" defaultValue={editingAccount?.displayName} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Parent Email Address</Label>
+                  <Input name="email" type="email" defaultValue={editingAccount?.email} required />
+                  <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> Warning: Email change will update all linked student records.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button disabled={isUpdating} type="submit" className="w-full bg-rose-600">Save Account Changes</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Link Student Dialog */}
         <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
@@ -415,8 +546,8 @@ export default function ParentPortalPage() {
             <circle cx="50" cy="180" r="100" fill="white" />
           </svg>
         </div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-4">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/10">
               <Heart className="w-5 h-5 fill-current" />
             </div>
@@ -426,6 +557,38 @@ export default function ParentPortalPage() {
             </div>
           </div>
           
+          <div className="flex items-center gap-2">
+            <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white border-none h-9 text-[10px] font-bold uppercase tracking-widest shadow-lg backdrop-blur-md">
+                  <Settings className="h-3.5 w-3.5 mr-1.5" /> Edit Profile
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleUpdateMyProfile}>
+                  <DialogHeader><DialogTitle>Update My Account</DialogTitle></DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Your Display Name</Label>
+                      <Input name="name" defaultValue={profile?.displayName} required />
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Account Email</p>
+                      <p className="text-xs text-gray-600 font-medium">{profile?.email}</p>
+                      <p className="text-[9px] text-gray-400 italic mt-1">To change your email, please contact the administration office.</p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button disabled={isUpdating} type="submit" className="w-full bg-rose-600">Save Profile</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-6">
+          <p className="text-[10px] font-bold text-white/60 uppercase tracking-[0.2em] mb-3">Linked Children</p>
           <div className="flex flex-wrap gap-2">
             {myChildren.map((child) => (
               <button 

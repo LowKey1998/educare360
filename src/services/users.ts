@@ -1,5 +1,5 @@
 
-import { Database, ref, set, remove, serverTimestamp } from 'firebase/database';
+import { Database, ref, set, remove, update, get, serverTimestamp } from 'firebase/database';
 import { UserProfile } from '@/lib/types';
 
 export const userService = {
@@ -11,6 +11,41 @@ export const userService = {
       createdAt: serverTimestamp()
     });
   },
+
+  async registerParent(db: Database, data: { displayName: string, email: string }) {
+    const tempId = data.email.toLowerCase().replace(/[.@]/g, '_');
+    return set(ref(db, `users/${tempId}`), {
+      displayName: data.displayName,
+      email: data.email.toLowerCase(),
+      role: 'parent',
+      createdAt: serverTimestamp()
+    });
+  },
+
+  async updateParentProfile(db: Database, userId: string, oldEmail: string, data: { displayName: string, email: string }) {
+    const newEmail = data.email.toLowerCase();
+    const updates: any = {};
+
+    // Update User Entry
+    updates[`users/${userId}/displayName`] = data.displayName;
+    updates[`users/${userId}/email`] = newEmail;
+
+    // If email changed, we MUST update all linked students to maintain the association
+    if (oldEmail.toLowerCase() !== newEmail) {
+      const studentsSnapshot = await get(ref(db, 'students'));
+      const students = studentsSnapshot.val();
+      if (students) {
+        Object.entries(students).forEach(([sId, student]: [string, any]) => {
+          if (student.parentEmail?.toLowerCase() === oldEmail.toLowerCase()) {
+            updates[`students/${sId}/parentEmail`] = newEmail;
+          }
+        });
+      }
+    }
+
+    return update(ref(db), updates);
+  },
+
   async deleteUser(db: Database, id: string) {
     return remove(ref(db, `users/${id}`));
   }
