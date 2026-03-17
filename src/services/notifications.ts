@@ -1,13 +1,13 @@
 
 import { Database, ref, push, update, remove, serverTimestamp, get, set } from 'firebase/database';
 import { AppNotification } from '@/lib/types';
+import { mailService } from './mail';
 
 export const notificationService = {
   /**
    * Registers or updates an FCM token for a user.
    */
   async registerFCMToken(db: Database, userId: string, token: string) {
-    // We store tokens in a map to support multiple devices per user
     const tokenHash = token.replace(/[.#$/[\]]/g, '_');
     return set(ref(db, `users/${userId}/fcmTokens/${tokenHash}`), {
       token,
@@ -24,9 +24,6 @@ export const notificationService = {
       read: false,
       createdAt: serverTimestamp()
     });
-
-    // In a real production environment, you would trigger a Cloud Function here
-    // that reads users/${userId}/fcmTokens and sends a real Push Notification via FCM Admin SDK.
     return notificationRef;
   },
 
@@ -76,10 +73,18 @@ export const notificationService = {
   },
 
   async resendPortalInvite(db: Database, email: string) {
+    // 1. Send simulated email to parent
+    await mailService.sendEmail(db, {
+      to: email,
+      subject: 'Complete Your Portal Registration',
+      body: `Hello,\n\nYou have been invited to join the school's Parent Portal. Please use the following details to sign in and track your child's progress.\n\nPortal URL: /login\nEmail: ${email}\n\nThank you!`
+    });
+
+    // 2. Notify admin that invite was sent
     return this.notifyRole(db, 'admin', {
-      title: 'Portal Invite Resent',
-      message: `A portal registration link was resent to ${email}.`,
-      type: 'info'
+      title: 'Portal Invite Sent',
+      message: `A portal registration email was dispatched to ${email}.`,
+      type: 'success'
     });
   }
 };
