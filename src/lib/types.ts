@@ -8,6 +8,7 @@ export interface UserProfile {
   role: UserRole;
   displayName?: string;
   department?: string;
+  password?: string;
   createdAt?: any;
 }
 

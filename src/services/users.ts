@@ -12,23 +12,28 @@ export const userService = {
     });
   },
 
-  async registerParent(db: Database, data: { displayName: string, email: string }) {
+  async registerParent(db: Database, data: { displayName: string, email: string, password?: string }) {
     const tempId = data.email.toLowerCase().replace(/[.@]/g, '_');
     return set(ref(db, `users/${tempId}`), {
       displayName: data.displayName,
       email: data.email.toLowerCase(),
+      password: data.password || 'password123', // Default prototype password
       role: 'parent',
       createdAt: serverTimestamp()
     });
   },
 
-  async updateParentProfile(db: Database, userId: string, oldEmail: string, data: { displayName: string, email: string }) {
+  async updateParentProfile(db: Database, userId: string, oldEmail: string, data: { displayName: string, email: string, password?: string }) {
     const newEmail = data.email.toLowerCase();
     const updates: any = {};
 
     // Update User Entry
     updates[`users/${userId}/displayName`] = data.displayName;
     updates[`users/${userId}/email`] = newEmail;
+    
+    if (data.password) {
+      updates[`users/${userId}/password`] = data.password;
+    }
 
     // If email changed, we MUST update all linked students to maintain the association
     if (oldEmail.toLowerCase() !== newEmail) {

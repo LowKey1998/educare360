@@ -27,7 +27,8 @@ import {
   Check,
   X,
   UserCircle,
-  Settings
+  Settings,
+  Lock
 } from 'lucide-react';
 import { useUserProfile, useDatabase, useRTDBCollection, useRTDBDoc } from '@/firebase';
 import { 
@@ -108,6 +109,7 @@ export default function ParentPortalPage() {
         displayName: account.displayName || 'Unnamed Parent',
         students: students.filter(s => s.parentEmail?.toLowerCase() === email),
         userId: account.id || account.uid,
+        password: account.password,
         lastLogin: account.createdAt
       });
     });
@@ -180,9 +182,10 @@ export default function ParentPortalPage() {
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
     const email = (formData.get('email') as string).toLowerCase();
+    const password = formData.get('password') as string;
 
     try {
-      await userService.registerParent(database, { displayName: name, email });
+      await userService.registerParent(database, { displayName: name, email, password });
       setIsAddAccountOpen(false);
       toast({ title: "Account Provisioned", description: "The parent can now sign in with this email." });
     } catch (e) {
@@ -199,11 +202,13 @@ export default function ParentPortalPage() {
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
     const email = (formData.get('email') as string).toLowerCase();
+    const password = formData.get('password') as string;
 
     try {
       await userService.updateParentProfile(database, editingAccount.userId, editingAccount.email, {
         displayName: name,
-        email
+        email,
+        password: password || undefined
       });
       setIsEditAccountOpen(false);
       setEditingAccount(null);
@@ -221,11 +226,13 @@ export default function ParentPortalPage() {
     setIsUpdating(true);
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
+    const password = formData.get('password') as string;
 
     try {
       await userService.updateParentProfile(database, profile.uid, profile.email || '', {
         displayName: name,
-        email: profile.email || ''
+        email: profile.email || '',
+        password: password || undefined
       });
       setIsProfileOpen(false);
       toast({ title: "Profile Updated" });
@@ -293,6 +300,10 @@ export default function ParentPortalPage() {
                       <div className="space-y-2">
                         <Label>Email Address</Label>
                         <Input name="email" type="email" placeholder="parent@example.com" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Set Password</Label>
+                        <Input name="password" type="text" placeholder="Minimum 6 characters" defaultValue="password123" required />
                       </div>
                     </div>
                     <DialogFooter>
@@ -435,6 +446,10 @@ export default function ParentPortalPage() {
                     <AlertCircle className="h-3 w-3" /> Warning: Email change will update all linked student records.
                   </p>
                 </div>
+                <div className="space-y-2">
+                  <Label>Reset Password</Label>
+                  <Input name="password" type="text" placeholder="Leave empty to keep current" defaultValue={editingAccount?.password} />
+                </div>
               </div>
               <DialogFooter>
                 <Button disabled={isUpdating} type="submit" className="w-full bg-rose-600">Save Account Changes</Button>
@@ -571,6 +586,10 @@ export default function ParentPortalPage() {
                     <div className="space-y-2">
                       <Label>Your Display Name</Label>
                       <Input name="name" defaultValue={profile?.displayName} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Change Password</Label>
+                      <Input name="password" type="password" placeholder="••••••••" />
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Account Email</p>
