@@ -78,6 +78,25 @@ export interface Subject {
   createdAt?: any;
 }
 
+export interface Department {
+  id: string;
+  name: string;
+  head?: string;
+  createdAt?: any;
+}
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string;
+  coverUrl?: string;
+  downloadUrl?: string;
+  category: string;
+  addedBy: string;
+  createdAt: any;
+}
+
 export interface Classroom {
   id: string;
   name: string;

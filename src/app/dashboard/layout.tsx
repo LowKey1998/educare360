@@ -36,7 +36,8 @@ import {
   X,
   CheckCheck,
   Info,
-  AlertCircle
+  AlertCircle,
+  Library
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -188,6 +189,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { title: 'ECD Development', icon: Baby, href: '/dashboard/ecd' },
         { title: 'Academic Mgmt', icon: GraduationCap, href: '/dashboard/academic' },
         { title: 'Classroom Mgmt', icon: BookOpen, href: '/dashboard/classroom' },
+        { title: 'Digital Library', icon: Library, href: '/dashboard/library' },
         { title: 'Attendance', icon: ClipboardCheck, href: '/dashboard/attendance' },
         { title: 'Timetable & Calendar', icon: Calendar, href: '/dashboard/calendar' },
       ]
@@ -238,6 +240,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       color: 'text-amber-400',
       items: [
         { title: 'ECD Progress', icon: Baby, href: '/dashboard/ecd' },
+        { title: 'Digital Library', icon: Library, href: '/dashboard/library' },
         { title: 'Timetable', icon: Calendar, href: '/dashboard/calendar' },
         { title: 'Attendance', icon: ClipboardCheck, href: '/dashboard/attendance' },
       ]

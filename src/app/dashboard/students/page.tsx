@@ -42,7 +42,10 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { studentService } from '@/services/students';
 import { Student, UserProfile } from '@/lib/types';
+
+const GRADES = ['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 
 export default function PupilManagementPage() {
   const [search, setSearch] = useState('');
@@ -96,21 +99,18 @@ export default function PupilManagementPage() {
     setIsAddSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = {
-      studentName: formData.get('name'),
-      admissionNo: formData.get('admNo'),
-      grade: formData.get('grade'),
-      gender: formData.get('gender'),
-      guardianName: formData.get('guardianName'),
-      guardianPhone: formData.get('guardianPhone'),
-      parentEmail: formData.get('parentEmail')?.toString().toLowerCase().trim(),
+      studentName: formData.get('name') as string,
+      admissionNo: formData.get('admNo') as string,
+      grade: formData.get('grade') as string,
+      gender: formData.get('gender') as any,
+      guardianName: formData.get('guardianName') as string,
+      guardianPhone: formData.get('guardianPhone') as string,
+      parentEmail: formData.get('parentEmail')?.toString().toLowerCase().trim() || '',
       status: 'Active',
-      feeBalance: 0,
-      attendanceRate: 100,
-      createdAt: serverTimestamp()
     };
 
     try {
-      await push(ref(database, 'students'), data);
+      await studentService.enrollPupil(database, data);
       setIsAddOpen(false);
       toast({ title: "Pupil Enrolled", description: `${data.studentName} has been added to the registry.` });
     } catch (e) {
@@ -167,7 +167,7 @@ export default function PupilManagementPage() {
               <SelectTrigger className="w-[160px] h-10 text-xs"><SelectValue placeholder="Grade" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="All Grades">All Grades</SelectItem>
-                {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
               </SelectContent>
             </Select>
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -194,7 +194,7 @@ export default function PupilManagementPage() {
                         <Select name="grade" defaultValue="Grade 1">
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                            {GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -297,7 +297,7 @@ export default function PupilManagementPage() {
                     <td className="px-4 py-4 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button className="p-1.5 text-gray-300 hover:text-teal-600 transition-colors"><Eye className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => remove(ref(database, `students/${student.id}`))} className="p-1.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all">
+                        <button onClick={() => studentService.deletePupil(database, student.id)} className="p-1.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>

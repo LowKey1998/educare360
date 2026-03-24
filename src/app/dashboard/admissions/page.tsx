@@ -54,6 +54,7 @@ const STATUS_CONFIG: Record<string, { color: string, dot: string, bg: string, ic
 };
 
 const STATUS_LABELS = ['New', 'Under Review', 'Interview', 'Accepted', 'Waitlisted', 'Rejected'];
+const GRADES = ['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 
 export default function AdmissionsPage() {
   const [search, setSearch] = useState('');
@@ -203,7 +204,7 @@ export default function AdmissionsPage() {
                       <Select name="grade" defaultValue="Grade 1">
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                          {GRADES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>

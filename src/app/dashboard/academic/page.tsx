@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from 'react';
@@ -57,6 +58,8 @@ const trendData = [
   { name: 'T3 2025', grade4: 73, grade5: 76, grade6: 78, grade7: 77 },
   { name: 'T1 2026', grade4: 75, grade5: 78, grade6: 80, grade7: 79 },
 ];
+
+const GRADES = ['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
 
 export default function AcademicManagementPage() {
   const [activeGrade, setActiveGrade] = useState('Grade 5');
@@ -173,7 +176,7 @@ export default function AcademicManagementPage() {
             <SelectValue placeholder="Select Grade" />
           </SelectTrigger>
           <SelectContent>
-            {['Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].map(grade => (
+            {GRADES.map(grade => (
               <SelectItem key={grade} value={grade}>{grade}</SelectItem>
             ))}
           </SelectContent>

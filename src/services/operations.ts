@@ -1,6 +1,6 @@
 
 import { Database, ref, push, remove, serverTimestamp } from 'firebase/database';
-import { Asset, HealthRecord, MealPlan, School } from '@/lib/types';
+import { Asset, HealthRecord, MealPlan, School, Book } from '@/lib/types';
 
 export const operationsService = {
   // Asset Management
@@ -54,5 +54,15 @@ export const operationsService = {
   },
   async deleteSchool(db: Database, id: string) {
     return remove(ref(db, `schools/${id}`));
+  },
+  // Digital Library
+  async addBook(db: Database, data: Omit<Book, 'id' | 'createdAt'>) {
+    return push(ref(db, 'library_books'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  },
+  async deleteBook(db: Database, id: string) {
+    return remove(ref(db, `library_books/${id}`));
   }
 };

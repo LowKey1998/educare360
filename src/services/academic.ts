@@ -1,6 +1,6 @@
 
 import { Database, ref, push, remove, update, serverTimestamp } from 'firebase/database';
-import { Classroom, Lesson, LessonPlan, Exam, PeriodStructure, Subject } from '@/lib/types';
+import { Classroom, Lesson, LessonPlan, Exam, PeriodStructure, Subject, Department } from '@/lib/types';
 
 export const academicService = {
   async saveMarks(db: Database, subjectCode: string, marks: Record<string, number>) {
@@ -85,5 +85,17 @@ export const academicService = {
 
   async deleteSubject(db: Database, id: string) {
     return remove(ref(db, `subjects/${id}`));
+  },
+
+  // Department Management
+  async addDepartment(db: Database, data: Omit<Department, 'id' | 'createdAt'>) {
+    return push(ref(db, 'departments'), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  },
+
+  async deleteDepartment(db: Database, id: string) {
+    return remove(ref(db, `departments/${id}`));
   }
 };
