@@ -6,9 +6,18 @@ export interface UserProfile {
   uid: string;
   email: string | null;
   role: UserRole;
+  customRoleId?: string;
   displayName?: string;
   department?: string;
   password?: string;
+  createdAt?: any;
+}
+
+export interface CustomRole {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
   createdAt?: any;
 }
 

@@ -37,7 +37,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { userService } from '@/services/users';
-import { UserProfile } from '@/lib/types';
+import { UserProfile, CustomRole } from '@/lib/types';
 
 export default function UsersRBACPage() {
   const [search, setSearch] = useState('');
@@ -47,6 +47,7 @@ export default function UsersRBACPage() {
   const database = useDatabase();
   const { toast } = useToast();
   const { data: users, loading } = useRTDBCollection<UserProfile>(database, 'users');
+  const { data: roles } = useRTDBCollection<CustomRole>(database, 'roles');
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
@@ -69,11 +70,13 @@ export default function UsersRBACPage() {
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
+    const customRoleId = formData.get('customRoleId') as string;
 
     const data = {
       displayName: formData.get('name') as string,
       email: email,
       role: formData.get('role') as any,
+      ...(customRoleId !== 'none' && { customRoleId }),
     };
 
     try {
@@ -173,6 +176,20 @@ export default function UsersRBACPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Override Navigation Policy (Optional)</Label>
+                  <Select name="customRoleId" defaultValue="none">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Base Permissions Only</SelectItem>
+                      {roles.map(r => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600">
@@ -219,13 +236,20 @@ export default function UsersRBACPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wide border shadow-sm ${
-                        user.role === 'admin' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
-                        user.role === 'staff' ? 'bg-teal-50 text-teal-600 border-teal-100' : 
-                        'bg-blue-50 text-blue-600 border-blue-100'
-                      }`}>
-                        {user.role}
-                      </span>
+                      <div className="flex flex-col gap-1.5">
+                        <span className={`px-2.5 py-1 w-fit rounded-lg text-[9px] font-bold uppercase tracking-wide border shadow-sm ${
+                          user.role === 'admin' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                          user.role === 'staff' ? 'bg-teal-50 text-teal-600 border-teal-100' : 
+                          'bg-blue-50 text-blue-600 border-blue-100'
+                        }`}>
+                          {user.role}
+                        </span>
+                        {user.customRoleId && (
+                          <span className="px-2 py-0.5 w-fit bg-purple-50 text-purple-600 border border-purple-100 rounded text-[9px] font-bold uppercase">
+                            {roles?.find(r => r.id === user.customRoleId)?.name || 'Custom Policy'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="inline-flex items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase tracking-tighter">

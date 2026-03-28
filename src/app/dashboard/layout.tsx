@@ -49,7 +49,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { notificationService } from '@/services/notifications';
-import { AppNotification } from '@/lib/types';
+import { AppNotification, CustomRole } from '@/lib/types';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useToast } from '@/hooks/use-toast';
 
@@ -63,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: admissions } = useRTDBCollection(database, 'admissions');
   const { data: announcements } = useRTDBCollection(database, 'announcements');
   const { data: notifications } = useRTDBCollection<AppNotification>(database, profile?.uid ? `notifications/${profile.uid}` : null);
-  
+  const { data: customRoles } = useRTDBCollection<CustomRole>(database, 'roles');
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -139,6 +139,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const primaryColor = schoolSettings?.primaryColor || '#0D9488';
 
+  const userCustomRole = useMemo(() => {
+    if (!profile?.customRoleId || !customRoles) return null;
+    return customRoles.find(r => r.id === profile.customRoleId) || null;
+  }, [profile?.customRoleId, customRoles]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F1A2E] flex items-center justify-center">
@@ -180,6 +185,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { title: 'Pupil Management', icon: Users, href: '/dashboard/students' },
         { title: 'Parent Portal', icon: Heart, href: '/dashboard/parent-portal', visible: isAdmin },
         { title: 'HR & Staff', icon: Briefcase, href: '/dashboard/hr', visible: profile.role === 'admin' },
+        { title: 'Roles & Permissions', icon: ShieldCheck, href: '/dashboard/roles', visible: profile.role === 'admin' },
       ]
     },
     {
@@ -319,7 +325,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="flex-1 overflow-y-auto px-3 pb-4 custom-scrollbar">
           {currentNav.map((group) => {
-            if (group.visible === false) return null;
+            const accessibleItems = isParent 
+              ? group.items.filter((item: any) => item.visible !== false)
+              : group.items.filter((item: any) => {
+                  if (userCustomRole) {
+                    if (item.href === '/dashboard' || item.href === '/dashboard/parent-portal' && profile.role === 'parent') return true;
+                    return userCustomRole.permissions?.includes(item.href);
+                  }
+                  return item.visible !== false;
+                });
+
+            const isGroupVisible = isParent 
+              ? (group as any).visible !== false
+              : (userCustomRole ? accessibleItems.length > 0 : (group as any).visible !== false && accessibleItems.length > 0);
+
+            if (!isGroupVisible || accessibleItems.length === 0) return null;
+
             return (
               <div key={group.label} className="mb-1">
                 <button className="w-full flex items-center justify-between px-2 py-2 text-[10px] font-semibold tracking-wider hover:bg-white/5 rounded-lg transition-colors">
@@ -327,8 +348,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown className="h-3 w-3 text-gray-600" />
                 </button>
                 <div className="space-y-0.5">
-                  {group.items.map((item: any) => {
-                    if (item.visible === false) return null;
+                  {accessibleItems.map((item: any) => {
                     const isActive = pathname === item.href;
                     return (
                       <Link 

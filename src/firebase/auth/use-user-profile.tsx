@@ -10,6 +10,7 @@ export interface UserProfile {
   uid: string;
   email: string | null;
   role: 'admin' | 'staff' | 'parent';
+  customRoleId?: string;
   displayName?: string;
   permissions?: string[];
 }
