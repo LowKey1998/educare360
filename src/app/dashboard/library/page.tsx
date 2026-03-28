@@ -14,9 +14,11 @@ import {
   Database,
   CheckCircle2,
   FileText,
-  Info
+  Info,
+  Camera
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection, useUserProfile } from '@/firebase';
+import { BarcodeScanner } from '@/components/BarcodeScanner';
 import { 
   Dialog, 
   DialogContent, 
@@ -40,6 +42,7 @@ export default function DigitalLibraryPage() {
   const [isFetching, setIsFetching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isbn, setIsbn] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
   
   // Book Form State
   const [bookData, setBookData] = useState<Partial<Book>>({
@@ -64,13 +67,14 @@ export default function DigitalLibraryPage() {
     );
   }, [books, search]);
 
-  const handleFetchMetadata = async () => {
-    if (!isbn) return;
+  const handleFetchMetadata = async (scannedIsbn?: string) => {
+    const targetIsbn = typeof scannedIsbn === 'string' ? scannedIsbn : isbn;
+    if (!targetIsbn) return;
     setIsFetching(true);
     try {
-      const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+      const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${targetIsbn}&format=json&jscmd=data`);
       const data = await response.json();
-      const bookInfo = data[`ISBN:${isbn}`];
+      const bookInfo = data[`ISBN:${targetIsbn}`];
       
       if (bookInfo) {
         setBookData({
@@ -167,26 +171,53 @@ export default function DigitalLibraryPage() {
                 <div className="grid gap-4 py-4">
                   <div className="flex gap-2">
                     <div className="flex-1 space-y-2">
-                      <Label>ISBN Code Entry</Label>
-                      <div className="relative">
-                        <Scan className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                        <Input 
-                          placeholder="e.g. 9780131103627" 
-                          className="pl-8" 
-                          value={isbn}
-                          onChange={(e) => setIsbn(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <Button 
-                      type="button" 
-                      onClick={handleFetchMetadata} 
-                      disabled={!isbn || isFetching} 
-                      className="mt-8 bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    >
+                       <Label>ISBN Code Entry</Label>
+                       <div className="flex items-center gap-2">
+                         <div className="relative flex-1">
+                           <Scan className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                           <Input 
+                             placeholder="e.g. 9780131103627" 
+                             className="pl-8 h-9" 
+                             value={isbn}
+                             onChange={(e) => setIsbn(e.target.value)}
+                           />
+                         </div>
+                         <Button 
+                           type="button" 
+                           onClick={() => setIsScanning(!isScanning)}
+                           variant={isScanning ? "default" : "outline"}
+                           className={`h-9 w-9 p-0 flex-shrink-0 ${isScanning ? 'bg-indigo-600' : ''}`}
+                           title="Scan Barcode"
+                         >
+                           <Camera className="h-4 w-4" />
+                         </Button>
+                       </div>
+                     </div>
+                     <Button 
+                       type="button" 
+                       onClick={() => handleFetchMetadata()} 
+                       disabled={!isbn || isFetching} 
+                       className="mt-8 bg-gray-100 text-gray-700 hover:bg-gray-200 h-9"
+                     >
                       {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Fetch Info'}
                     </Button>
                   </div>
+
+                  {isScanning && (
+                    <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl mt-2 animate-in fade-in zoom-in-95 duration-200">
+                      <BarcodeScanner 
+                        onScanSuccess={(text) => {
+                          setIsbn(text);
+                          setIsScanning(false);
+                          toast({ title: "Barcode Scanned", description: `ISBN Code: ${text}` });
+                          handleFetchMetadata(text);
+                        }} 
+                        onScanError={(err) => {
+                          // Silent failure for continued scanning frames
+                        }}
+                      />
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2">
                     <div className="space-y-2">
