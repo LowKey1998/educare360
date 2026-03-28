@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { ref, set, serverTimestamp, onValue } from 'firebase/database';
+import { ref, set, serverTimestamp, onValue, get, remove } from 'firebase/database';
 import { useAuth, useUser, useDatabase, useRTDBDoc } from '@/firebase';
 import { Mail, Lock, Eye, EyeOff, Loader2, Sparkles, UserCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -83,18 +83,65 @@ export default function LoginPage() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const newUser = userCredential.user;
         
-        // Create user profile in RTDB
-        await set(ref(database, `users/${newUser.uid}`), {
-          email: newUser.email,
-          role: role,
-          createdAt: serverTimestamp(),
-          displayName: name
-        });
+        if (newUser.email) {
+          // Find the invitation robustly
+          const usersSnapshot = await get(ref(database, 'users'));
+          let inviteData: any = null;
+          let inviteKey: string | null = null;
+          
+          if (usersSnapshot.exists()) {
+            const allUsers = usersSnapshot.val();
+            const tempIdLowercase = newUser.email.toLowerCase().replace(/[.@]/g, '_');
+            const tempIdOriginal = newUser.email.replace(/[.@]/g, '_');
+            
+            if (allUsers[tempIdLowercase] && !allUsers[tempIdLowercase].uid) {
+              inviteData = allUsers[tempIdLowercase];
+              inviteKey = tempIdLowercase;
+            } else if (allUsers[tempIdOriginal] && !allUsers[tempIdOriginal].uid) {
+              inviteData = allUsers[tempIdOriginal];
+              inviteKey = tempIdOriginal;
+            } else {
+              for (const [key, u] of Object.entries(allUsers)) {
+                if ((u as any).email?.toLowerCase() === newUser.email.toLowerCase() && key !== newUser.uid) {
+                  inviteData = u;
+                  inviteKey = key;
+                  break;
+                }
+              }
+            }
+          }
 
-        toast({
-          title: "Account created!",
-          description: `Welcome to ${schoolName}, ${name}. Registered as a ${role}.`,
-        });
+          if (inviteData && inviteData.role) {
+            // Found invited profile, merge
+            await set(ref(database, `users/${newUser.uid}`), {
+              ...inviteData,
+              email: newUser.email,
+              displayName: name || inviteData.displayName,
+              createdAt: serverTimestamp()
+            });
+            if (inviteKey) {
+              await remove(ref(database, `users/${inviteKey}`));
+            }
+            
+            toast({
+              title: "Account Activated!",
+              description: `Welcome to ${schoolName}, ${name}. Registered as ${inviteData.role}.`,
+            });
+          } else {
+            // Normal public registration (Parent or First Admin)
+            await set(ref(database, `users/${newUser.uid}`), {
+              email: newUser.email,
+              role: role,
+              createdAt: serverTimestamp(),
+              displayName: name
+            });
+
+            toast({
+              title: "Account created!",
+              description: `Welcome to ${schoolName}, ${name}. Registered as a ${role}.`,
+            });
+          }
+        }
       }
       router.push('/dashboard');
     } catch (error: any) {

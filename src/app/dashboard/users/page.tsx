@@ -14,7 +14,8 @@ import {
   Database,
   UserPlus,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Edit
 } from 'lucide-react';
 import { useDatabase, useRTDBCollection } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +35,8 @@ import {
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
-  SelectValue 
+  SelectValue,
+  SelectSeparator
 } from '@/components/ui/select';
 import { userService } from '@/services/users';
 import { UserProfile, CustomRole } from '@/lib/types';
@@ -42,6 +44,8 @@ import { UserProfile, CustomRole } from '@/lib/types';
 export default function UsersRBACPage() {
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const database = useDatabase();
@@ -70,13 +74,23 @@ export default function UsersRBACPage() {
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
-    const customRoleId = formData.get('customRoleId') as string;
+    const roleSelection = formData.get('role_selection') as string;
+
+    let role = 'staff';
+    let customRoleId: string | undefined;
+
+    if (roleSelection.startsWith('base:')) {
+      role = roleSelection.split('base:')[1];
+    } else if (roleSelection.startsWith('custom:')) {
+      role = 'staff'; 
+      customRoleId = roleSelection.split('custom:')[1];
+    }
 
     const data = {
       displayName: formData.get('name') as string,
       email: email,
-      role: formData.get('role') as any,
-      ...(customRoleId !== 'none' && { customRoleId }),
+      role: role as any,
+      ...(customRoleId && { customRoleId }),
     };
 
     try {
@@ -85,6 +99,41 @@ export default function UsersRBACPage() {
       toast({ title: "User Added", description: `${data.displayName} assigned the ${data.role} role.` });
     } catch (e) {
       toast({ title: "Error", description: "Failed to add user account.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const roleSelection = formData.get('role_selection') as string;
+
+    let role = 'staff';
+    let customRoleId: string | null = null;
+
+    if (roleSelection.startsWith('base:')) {
+      role = roleSelection.split('base:')[1];
+    } else if (roleSelection.startsWith('custom:')) {
+      role = 'staff'; 
+      customRoleId = roleSelection.split('custom:')[1];
+    }
+    
+    const data: any = {
+      displayName: formData.get('name') as string,
+      role: role,
+      customRoleId: customRoleId
+    };
+
+    try {
+      await userService.updateUser(database, editingUser.uid || editingUser.id!, data);
+      setIsEditOpen(false);
+      setEditingUser(null);
+      toast({ title: "Profile Updated", description: "User permissions rebuilt." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to update user.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -164,28 +213,20 @@ export default function UsersRBACPage() {
                   <Input name="email" type="email" placeholder="user@school.edu" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Assign System Role</Label>
-                  <Select name="role" defaultValue="staff">
+                  <Label>Assign Institutional Role</Label>
+                  <Select name="role_selection" defaultValue="base:staff">
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="staff">Staff/Teacher</SelectItem>
-                      <SelectItem value="parent">Parent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Override Navigation Policy (Optional)</Label>
-                  <Select name="customRoleId" defaultValue="none">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Base Permissions Only</SelectItem>
-                      {roles.map(r => (
-                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      <SelectItem value="base:admin">Administrator (Full Access)</SelectItem>
+                      <SelectItem value="base:staff">Staff/Teacher (Standard)</SelectItem>
+                      <SelectItem value="base:parent">Parent Portal User</SelectItem>
+                      {roles?.length > 0 && <SelectSeparator />}
+                      {roles?.map(r => (
+                        <SelectItem key={r.id} value={`custom:${r.id}`}>
+                          {r.name} (Custom Policy)
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -195,6 +236,53 @@ export default function UsersRBACPage() {
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Confirm Registration
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent>
+            <form onSubmit={handleEditUser}>
+              <DialogHeader>
+                <DialogTitle>Edit Platform Account</DialogTitle>
+              </DialogHeader>
+              {editingUser && (
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input name="name" defaultValue={editingUser.displayName} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email <span className="text-[10px] text-gray-400 font-normal">(Immutable)</span></Label>
+                    <Input name="email" value={editingUser.email || ''} disabled className="bg-gray-50 text-gray-400 border-gray-100" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assign Institutional Role</Label>
+                    <Select name="role_selection" defaultValue={editingUser.customRoleId ? `custom:${editingUser.customRoleId}` : `base:${editingUser.role}`}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="base:admin">Administrator (Full Access)</SelectItem>
+                        <SelectItem value="base:staff">Staff/Teacher (Standard)</SelectItem>
+                        <SelectItem value="base:parent">Parent Portal User</SelectItem>
+                        {roles?.length > 0 && <SelectSeparator />}
+                        {roles?.map(r => (
+                          <SelectItem key={r.id} value={`custom:${r.id}`}>
+                            {r.name} (Custom Policy)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 hover:bg-blue-700">
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save Changes
                 </Button>
               </DialogFooter>
             </form>
@@ -258,9 +346,14 @@ export default function UsersRBACPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleDeleteUser(user.id)} className="p-2 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={() => { setEditingUser(user); setIsEditOpen(true); }} className="p-2 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteUser(user.uid || user.id!)} className="p-2 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

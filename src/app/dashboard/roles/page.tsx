@@ -177,9 +177,9 @@ export default function RolesManagementPage() {
               <Plus className="h-3.5 w-3.5" /> Create Custom Role
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-            <form onSubmit={handleSaveRole} className="flex flex-col h-full">
-              <DialogHeader>
+          <DialogContent className="max-w-3xl h-[90vh] flex flex-col overflow-hidden">
+            <form onSubmit={handleSaveRole} className="flex flex-col flex-1 overflow-hidden">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>{editingRole ? 'Edit Role Policy' : 'Create Custom Role Policy'}</DialogTitle>
               </DialogHeader>
               

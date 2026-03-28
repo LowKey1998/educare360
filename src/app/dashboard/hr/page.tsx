@@ -11,6 +11,7 @@ import {
   Mail,
   Loader2,
   Trash2,
+  Edit,
   Database,
   ShieldCheck,
   UserCheck,
@@ -36,19 +37,22 @@ import {
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
-  SelectValue 
+  SelectValue,
+  SelectSeparator
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { userService } from '@/services/users';
 import { academicService } from '@/services/academic';
-import { UserProfile, Department } from '@/lib/types';
+import { UserProfile, Department, CustomRole } from '@/lib/types';
 
 export default function HRPage() {
   const [activeTab, setActiveTab] = useState('staff');
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<UserProfile | null>(null);
   const [isDeptOpen, setIsDeptOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -56,6 +60,7 @@ export default function HRPage() {
   const { toast } = useToast();
   const { data: users, loading } = useRTDBCollection<UserProfile>(database, 'users');
   const { data: departments, loading: deptsLoading } = useRTDBCollection<Department>(database, 'departments');
+  const { data: roles } = useRTDBCollection<CustomRole>(database, 'roles');
 
   const staffList = useMemo(() => {
     return users.filter(u => u.role === 'admin' || u.role === 'staff');
@@ -87,11 +92,24 @@ export default function HRPage() {
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
+    const roleSelection = formData.get('role_selection') as string;
+
+    let role = 'staff';
+    let customRoleId: string | undefined;
+
+    if (roleSelection.startsWith('base:')) {
+      role = roleSelection.split('base:')[1];
+    } else if (roleSelection.startsWith('custom:')) {
+      role = 'staff'; 
+      customRoleId = roleSelection.split('custom:')[1];
+    }
+    
     const data: Omit<UserProfile, 'id' | 'uid' | 'createdAt'> = {
       displayName: formData.get('name') as string,
       email: formData.get('email') as string,
-      role: formData.get('role') as any,
+      role: role as any,
       department: formData.get('dept') as string,
+      ...(customRoleId && { customRoleId })
     };
 
     try {
@@ -100,6 +118,43 @@ export default function HRPage() {
       toast({ title: "Staff Member Added", description: `${data.displayName} registered.` });
     } catch (e) {
       toast({ title: "Error", description: "Failed to add staff.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditStaff = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    setIsSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const roleSelection = formData.get('role_selection') as string;
+
+    let role = 'staff';
+    let customRoleId: string | null = null;
+
+    if (roleSelection.startsWith('base:')) {
+      role = roleSelection.split('base:')[1];
+    } else if (roleSelection.startsWith('custom:')) {
+      role = 'staff'; 
+      customRoleId = roleSelection.split('custom:')[1];
+    }
+    
+    // Using any because of the signature mismatch of partial and typescript
+    const data: any = {
+      displayName: formData.get('name') as string,
+      role: role,
+      department: (formData.get('dept') as string) || null,
+      customRoleId: customRoleId
+    };
+
+    try {
+      await userService.updateUser(database, editingStaff.uid || editingStaff.id!, data);
+      setIsEditOpen(false);
+      setEditingStaff(null);
+      toast({ title: "Profile Updated", description: "Staff changes saved successfully." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to update staff.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -190,12 +245,14 @@ export default function HRPage() {
                         <Input name="email" type="email" required />
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label>Role</Label>
-                            <Select name="role" defaultValue="staff">
+                            <Label>Institutional Role</Label>
+                            <Select name="role_selection" defaultValue="base:staff">
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="staff">Teacher</SelectItem>
-                                <SelectItem value="admin">Administrator</SelectItem>
+                                <SelectItem value="base:admin">Administrator (Full Access)</SelectItem>
+                                <SelectItem value="base:staff">Teacher / Staff (Standard)</SelectItem>
+                                {roles?.length > 0 && <SelectSeparator />}
+                                {roles?.map(r => <SelectItem key={r.id} value={`custom:${r.id}`}>{r.name} (Custom Policy)</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
@@ -214,12 +271,59 @@ export default function HRPage() {
                     </form>
                   </DialogContent>
                 </Dialog>
+
+                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                  <DialogContent>
+                    <form onSubmit={handleEditStaff}>
+                      <DialogHeader><DialogTitle>Edit Staff Profile</DialogTitle></DialogHeader>
+                      {editingStaff && (
+                        <div className="grid gap-4 py-4">
+                          <Label>Full Name</Label>
+                          <Input name="name" defaultValue={editingStaff.displayName} required />
+                          <Label>Email <span className="text-[10px] text-gray-400 font-normal">(Immutable)</span></Label>
+                          <Input name="email" value={editingStaff.email || ''} disabled className="bg-gray-50 text-gray-400 border-gray-100" />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Institutional Role</Label>
+                              <Select name="role_selection" defaultValue={editingStaff.customRoleId ? `custom:${editingStaff.customRoleId}` : `base:${editingStaff.role}`}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="base:admin">Administrator (Full Access)</SelectItem>
+                                  <SelectItem value="base:staff">Teacher / Staff (Standard)</SelectItem>
+                                  {roles?.length > 0 && <SelectSeparator />}
+                                  {roles?.map(r => <SelectItem key={r.id} value={`custom:${r.id}`}>{r.name} (Custom Policy)</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Department</Label>
+                              <Select name="dept" defaultValue={editingStaff.department}>
+                                <SelectTrigger><SelectValue placeholder="Choose dept..." /></SelectTrigger>
+                                <SelectContent>
+                                  {departments.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <DialogFooter><Button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 hover:bg-blue-700">Save Changes</Button></DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {loading ? <div className="p-20 text-center col-span-full">Syncing...</div> : filteredStaff.map((staff) => (
                   <div key={staff.id} className="border border-gray-100 rounded-xl p-4 hover:shadow-md transition-all group relative bg-white">
-                    <button onClick={() => handleDeleteStaff(staff.id)} className="absolute top-3 right-3 p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-600 transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                    <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => { setEditingStaff(staff); setIsEditOpen(true); }} className="p-1.5 text-gray-300 hover:text-blue-600">
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => handleDeleteStaff(staff.uid || staff.id!)} className="p-1.5 text-gray-300 hover:text-red-600">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
                         {staff.displayName?.[0] || '?'}

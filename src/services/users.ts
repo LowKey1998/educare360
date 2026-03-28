@@ -5,10 +5,12 @@ import { mailService } from './mail';
 
 export const userService = {
   async inviteUser(db: Database, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt'>) {
-    const tempId = data.email?.replace(/[.@]/g, '_') || 'unknown';
+    const normalizedEmail = data.email?.toLowerCase();
+    const tempId = normalizedEmail?.replace(/[.@]/g, '_') || 'unknown';
     
     await set(ref(db, `users/${tempId}`), {
       ...data,
+      email: normalizedEmail,
       createdAt: serverTimestamp()
     });
 
@@ -80,5 +82,9 @@ export const userService = {
 
   async deleteUser(db: Database, id: string) {
     return remove(ref(db, `users/${id}`));
+  },
+
+  async updateUser(db: Database, id: string, data: Partial<Omit<UserProfile, 'id' | 'uid' | 'createdAt'>>) {
+    return update(ref(db, `users/${id}`), data);
   }
 };
