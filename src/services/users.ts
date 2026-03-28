@@ -1,5 +1,8 @@
 
 import { Database, ref, set, remove, update, get, serverTimestamp } from 'firebase/database';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { firebaseConfig } from '@/firebase/config';
 import { UserProfile } from '@/lib/types';
 import { mailService } from './mail';
 
@@ -24,6 +27,37 @@ export const userService = {
     }
     
     return tempId;
+  },
+
+  async createStaffAccount(db: Database, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt'>, pass: string) {
+    const appName = "SecondaryUserCreationApp";
+    let secondaryApp = getApps().find(app => app.name === appName);
+    if (!secondaryApp) {
+      secondaryApp = initializeApp(firebaseConfig, appName);
+    }
+    
+    const secondaryAuth = getAuth(secondaryApp);
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email!, pass);
+    const newUid = userCredential.user.uid;
+    
+    await secondaryAuth.signOut();
+    
+    const normalizedEmail = data.email?.toLowerCase();
+    await set(ref(db, `users/${newUid}`), {
+      ...data,
+      email: normalizedEmail,
+      createdAt: serverTimestamp()
+    });
+
+    if (data.email) {
+      await mailService.sendEmail(db, {
+        to: data.email,
+        subject: 'Institutional Platform Access',
+        body: `Hello ${data.displayName},\n\nYour institutional account has been fully registered by an Administrator.\n\nEmail: ${data.email}\nTemporary Password: ${pass}`
+      });
+    }
+
+    return newUid;
   },
 
   async registerParent(db: Database, data: { displayName: string, email: string, password?: string }) {

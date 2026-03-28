@@ -112,12 +112,20 @@ export default function HRPage() {
       ...(customRoleId && { customRoleId })
     };
 
+    const password = formData.get('password') as string;
+
     try {
-      await userService.inviteUser(database, data);
-      setIsAddOpen(false);
-      toast({ title: "Staff Member Added", description: `${data.displayName} registered.` });
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to add staff.", variant: "destructive" });
+      if (password) {
+        await userService.createStaffAccount(database, data, password);
+        setIsAddOpen(false);
+        toast({ title: "Account Created", description: `${data.displayName} has been fully registered.` });
+      } else {
+        await userService.inviteUser(database, data);
+        setIsAddOpen(false);
+        toast({ title: "Invitation Sent", description: `${data.displayName} has been sent an invitation link.` });
+      }
+    } catch (e: any) {
+      toast({ title: "Creation Failed", description: e.message || "Failed to add staff.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -241,8 +249,16 @@ export default function HRPage() {
                       <div className="grid gap-4 py-4">
                         <Label>Full Name</Label>
                         <Input name="name" required />
-                        <Label>Email</Label>
-                        <Input name="email" type="email" required />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Email</Label>
+                            <Input name="email" type="email" required />
+                          </div>
+                          <div>
+                            <Label>Temporary Password <span className="text-[10px] text-gray-400 font-normal">(Optional)</span></Label>
+                            <Input name="password" type="text" placeholder="Leave blank for invite-only" />
+                          </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label>Institutional Role</Label>

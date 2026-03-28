@@ -1,5 +1,5 @@
 
-export type UserRole = 'admin' | 'staff' | 'parent';
+export type UserRole = 'admin' | 'staff' | 'parent' | 'student';
 
 export interface UserProfile {
   id: string;
@@ -30,6 +30,7 @@ export interface Student {
   guardianName: string;
   guardianPhone: string;
   parentEmail: string;
+  studentEmail?: string;
   feeBalance: number;
   attendanceRate: number;
   status: string;

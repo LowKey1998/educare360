@@ -93,12 +93,20 @@ export default function UsersRBACPage() {
       ...(customRoleId && { customRoleId }),
     };
 
+    const password = formData.get('password') as string;
+
     try {
-      await userService.inviteUser(database, data);
-      setIsAddOpen(false);
-      toast({ title: "User Added", description: `${data.displayName} assigned the ${data.role} role.` });
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to add user account.", variant: "destructive" });
+      if (password) {
+        await userService.createStaffAccount(database, data, password);
+        setIsAddOpen(false);
+        toast({ title: "Account Created", description: `${data.displayName} has been fully registered.` });
+      } else {
+        await userService.inviteUser(database, data);
+        setIsAddOpen(false);
+        toast({ title: "Invitation Sent", description: `${data.displayName} has been sent an invitation.` });
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to add user account.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -208,9 +216,15 @@ export default function UsersRBACPage() {
                   <Label>Full Name</Label>
                   <Input name="name" placeholder="Institutional User" required />
                 </div>
-                <div className="space-y-2">
-                  <Label>Email Address</Label>
-                  <Input name="email" type="email" placeholder="user@school.edu" required />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email Address</Label>
+                    <Input name="email" type="email" placeholder="user@school.edu" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Temporary Password <span className="text-[10px] font-normal text-gray-400">(Optional)</span></Label>
+                    <Input name="password" type="text" placeholder="Leave blank for invite" />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Assign Institutional Role</Label>
